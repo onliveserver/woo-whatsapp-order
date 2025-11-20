@@ -616,8 +616,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 		flush();
 
-		// Die immediately - use wp_die with specific params to prevent any extra output
-		wp_die( '', '', [ 'response' => null, 'exit' => true ] );
+		// Exit immediately without any additional output
+		exit;
 	}
 
 	/**
