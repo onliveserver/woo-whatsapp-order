@@ -436,171 +436,170 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/></svg>';
 		}
 
-		/**
-		 * AJAX handler to build WhatsApp URL.
-		 */
-		public function handle_ajax_message()
-		{
-			// Log the start of AJAX request
-			$this->log_error('=== AJAX REQUEST START ===');
-			$this->log_error('Timestamp: ' . date('Y-m-d H:i:s'));
-			$this->log_error('User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
-			$this->log_error('User ID: ' . (is_user_logged_in() ? get_current_user_id() : 'N/A'));
-			$this->log_error('Request method: ' . $_SERVER['REQUEST_METHOD']);
-			$this->log_error('Action: ' . ($_REQUEST['action'] ?? 'none'));
-			$this->log_error('DOING_AJAX defined: ' . (defined('DOING_AJAX') ? 'YES' : 'NO'));
-			$this->log_error('DOING_AJAX value: ' . (defined('DOING_AJAX') ? DOING_AJAX : 'N/A'));
-			$this->log_error('POST data: ' . json_encode($_POST));
-			$this->log_error('GET data: ' . json_encode($_GET));
-			$this->log_error('REQUEST data: ' . json_encode($_REQUEST));
-			$this->log_error('SERVER SCRIPT_NAME: ' . ($_SERVER['SCRIPT_NAME'] ?? 'none'));
-			$this->log_error('SERVER REQUEST_URI: ' . ($_SERVER['REQUEST_URI'] ?? 'none'));
+	/**
+	 * AJAX handler to build WhatsApp URL.
+	 */
+	public function handle_ajax_message()
+	{
+		// Log the start of AJAX request
+		$this->log_error('=== AJAX REQUEST START ===');
+		$this->log_error('Timestamp: ' . date('Y-m-d H:i:s'));
+		$this->log_error('User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
+		$this->log_error('User ID: ' . (is_user_logged_in() ? get_current_user_id() : 'N/A'));
+		$this->log_error('Request method: ' . $_SERVER['REQUEST_METHOD']);
+		$this->log_error('Action: ' . ($_REQUEST['action'] ?? 'none'));
+		$this->log_error('DOING_AJAX defined: ' . (defined('DOING_AJAX') ? 'YES' : 'NO'));
+		$this->log_error('DOING_AJAX value: ' . (defined('DOING_AJAX') ? DOING_AJAX : 'N/A'));
+		$this->log_error('POST data: ' . json_encode($_POST));
+		$this->log_error('GET data: ' . json_encode($_GET));
+		$this->log_error('REQUEST data: ' . json_encode($_REQUEST));
+		$this->log_error('SERVER SCRIPT_NAME: ' . ($_SERVER['SCRIPT_NAME'] ?? 'none'));
+		$this->log_error('SERVER REQUEST_URI: ' . ($_SERVER['REQUEST_URI'] ?? 'none'));
 
-			// Check if this is actually our request
-			$action = $_REQUEST['action'] ?? '';
-			if ($action !== 'vaog2jucg3f2') {
-				$this->log_error('ERROR: Wrong action received: ' . $action . ' (expected: vaog2jucg3f2)');
-				return; // Don't process wrong actions
+		// Check if this is actually our request
+		$action = $_REQUEST['action'] ?? '';
+		if ($action !== 'vaog2jucg3f2') {
+			$this->log_error('ERROR: Wrong action received: ' . $action . ' (expected: vaog2jucg3f2)');
+			$this->send_json_response(false, 'Invalid action', []);
+			return; // Don't process wrong actions
+		}
+
+		$this->log_error('Action is correct, processing request...');
+
+		// Clear output buffers
+		while (ob_get_level() > 0) {
+			ob_end_clean();
+		}
+
+		// Force JSON response headers
+		header('Content-Type: application/json; charset=UTF-8', true);
+
+		// Ensure WooCommerce is properly loaded for AJAX requests
+		if (!defined('WC_ABSPATH')) {
+			define('WC_ABSPATH', dirname(WP_PLUGIN_DIR . '/woocommerce/woocommerce.php') . '/');
+		}
+
+		// Initialize WooCommerce if not already done
+		if (!function_exists('WC') && !did_action('woocommerce_init')) {
+			$this->log_error('Initializing WooCommerce...');
+			// Load WooCommerce core
+			require_once WP_PLUGIN_DIR . '/woocommerce/woocommerce.php';
+			// Initialize WooCommerce
+			WC();
+			$this->log_error('WooCommerce initialized');
+		}
+
+		// Ensure session is started for non-logged-in users
+		if (!is_user_logged_in() && function_exists('WC')) {
+			$this->log_error('Initializing session/cart for non-logged-in user');
+			if (!WC()->session) {
+				WC()->initialize_session();
+				$this->log_error('Session initialized');
 			}
-
-			$this->log_error('Action is correct, processing request...');
-
-			// Clear output buffers
-			while (ob_get_level() > 0) {
-				ob_end_clean();
-			}
-
-			// Force JSON response headers
-			header('Content-Type: application/json; charset=UTF-8', true);
-
-			// Ensure WooCommerce is properly loaded for AJAX requests
-			if (!defined('WC_ABSPATH')) {
-				define('WC_ABSPATH', dirname(WP_PLUGIN_DIR . '/woocommerce/woocommerce.php') . '/');
-			}
-
-			// Initialize WooCommerce if not already done
-			if (!function_exists('WC') && !did_action('woocommerce_init')) {
-				$this->log_error('Initializing WooCommerce...');
-				// Load WooCommerce core
-				require_once WP_PLUGIN_DIR . '/woocommerce/woocommerce.php';
-				// Initialize WooCommerce
-				WC();
-				$this->log_error('WooCommerce initialized');
-			}
-
-			// Ensure session is started for non-logged-in users
-			if (!is_user_logged_in() && function_exists('WC')) {
-				$this->log_error('Initializing session/cart for non-logged-in user');
-				if (!WC()->session) {
-					WC()->initialize_session();
-					$this->log_error('Session initialized');
-				}
-				if (!WC()->cart) {
-					WC()->initialize_cart();
-					$this->log_error('Cart initialized');
-				}
-			}
-
-			$debug_info = [
-				'timestamp' => time(),
-				'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
-				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
-				'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
-				'action' => $_REQUEST['action'] ?? 'none',
-			];
-
-			try {
-				$this->log_error('Checking if plugin is enabled...');
-				// Check if plugin is enabled
-				if (! $this->plugin->is_enabled()) {
-					$this->log_error('Plugin is disabled');
-					$debug_info['error'] = 'Plugin disabled';
-					$this->send_json_response(false, 'Plugin is disabled', ['debug' => $debug_info]);
-				}
-
-				$this->log_error('Plugin is enabled, getting context...');
-				// Get context
-				$context = isset($_POST['context']) ? sanitize_key(wp_unslash($_POST['context'])) : 'product';
-				$debug_info['context'] = $context;
-				$this->log_error('Context: ' . $context);
-
-			// Prepare data
-			if ('cart' === $context) {
-				$data = $this->prepare_cart_data();
-				$debug_info['data_type'] = 'cart';
-			} else {
-				$product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
-
-				if (! $product_id) {
-					$debug_info['error'] = 'Product ID required';
-					$this->send_json_response(false, 'Product ID is required', ['debug' => $debug_info]);
-				}
-
-				$variation_id = isset($_POST['variation_id']) ? absint(wp_unslash($_POST['variation_id'])) : 0;
-				$quantity     = isset($_POST['quantity']) ? max(1, absint(wp_unslash($_POST['quantity']))) : 1;
-				$variations   = isset($_POST['variations']) ? json_decode(wp_unslash($_POST['variations']), true) : [];
-
-				$debug_info['product_id'] = $product_id;
-				$debug_info['variation_id'] = $variation_id;
-				$debug_info['quantity'] = $quantity;
-
-				$data = $this->prepare_product_data($product_id, $variation_id, $quantity, $variations);
-				$this->log_error('Product data prepared: ' . (is_wp_error($data) ? 'ERROR - ' . $data->get_error_message() : 'SUCCESS'));
-			}
-
-			// Check for errors
-			if (is_wp_error($data)) {
-				$this->log_error('Data preparation error: ' . $data->get_error_message());
-				$debug_info['error'] = 'Data preparation error: ' . $data->get_error_message();
-				$this->send_json_response(false, $data->get_error_message(), ['debug' => $debug_info]);
-			}
-
-			if (empty($data) || ! is_array($data)) {
-				$this->log_error('Data is empty or not an array');
-				$debug_info['error'] = 'Data empty or invalid';
-				$this->send_json_response(false, 'Unable to retrieve product data', ['debug' => $debug_info]);
-			}
-
-			$this->log_error('Data validation passed, generating message...');
-
-			// Generate message
-			$message = $this->plugin->generate_message($context, $data);
-			if (empty($message)) {
-				$this->log_error('Message generation failed');
-				$debug_info['error'] = 'Message generation failed';
-				$this->send_json_response(false, 'Unable to generate message', ['debug' => $debug_info]);
-			}
-
-			$this->log_error('Message generated successfully, getting WhatsApp URL...');
-
-			// Get WhatsApp URL
-			$url = $this->plugin->get_whatsapp_url($message);
-
-			// Fallback URL
-			if (empty($url)) {
-				$url = 'https://wa.me/?text=' . rawurlencode($message);
-			}
-
-			$this->log_error('WhatsApp URL generated: ' . $url);
-			$this->log_error('=== AJAX REQUEST END - SUCCESS ===');
-
-			$debug_info['success'] = true;
-			$debug_info['url_length'] = strlen($url);
-			$debug_info['message_length'] = strlen($message);
-
-			// Return success
-			$this->send_json_response(true, 'Success', ['url' => $url, 'message' => $message, 'debug' => $debug_info]);
-
-			} catch (Exception $e) {
-				$this->log_error('=== AJAX REQUEST END - EXCEPTION ===');
-				$this->log_error('Exception: ' . $e->getMessage());
-				$this->log_error('Stack trace: ' . $e->getTraceAsString());
-				$debug_info['exception'] = $e->getMessage();
-				$this->send_json_response(false, 'Exception: ' . $e->getMessage(), ['debug' => $debug_info]);
+			if (!WC()->cart) {
+				WC()->initialize_cart();
+				$this->log_error('Cart initialized');
 			}
 		}
 
-		/**
+		$debug_info = [
+			'timestamp' => time(),
+			'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
+			'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+			'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
+			'action' => $_REQUEST['action'] ?? 'none',
+		];
+
+		try {
+			$this->log_error('Checking if plugin is enabled...');
+			// Check if plugin is enabled
+			if (! $this->plugin->is_enabled()) {
+				$this->log_error('Plugin is disabled');
+				$debug_info['error'] = 'Plugin disabled';
+				$this->send_json_response(false, 'Plugin is disabled', ['debug' => $debug_info]);
+			}
+
+			$this->log_error('Plugin is enabled, getting context...');
+			// Get context
+			$context = isset($_POST['context']) ? sanitize_key(wp_unslash($_POST['context'])) : 'product';
+			$debug_info['context'] = $context;
+			$this->log_error('Context: ' . $context);
+
+		// Prepare data
+		if ('cart' === $context) {
+			$data = $this->prepare_cart_data();
+			$debug_info['data_type'] = 'cart';
+		} else {
+			$product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
+
+			if (! $product_id) {
+				$debug_info['error'] = 'Product ID required';
+				$this->send_json_response(false, 'Product ID is required', ['debug' => $debug_info]);
+			}
+
+			$variation_id = isset($_POST['variation_id']) ? absint(wp_unslash($_POST['variation_id'])) : 0;
+			$quantity     = isset($_POST['quantity']) ? max(1, absint(wp_unslash($_POST['quantity']))) : 1;
+			$variations   = isset($_POST['variations']) ? json_decode(wp_unslash($_POST['variations']), true) : [];
+
+			$debug_info['product_id'] = $product_id;
+			$debug_info['variation_id'] = $variation_id;
+			$debug_info['quantity'] = $quantity;
+
+			$data = $this->prepare_product_data($product_id, $variation_id, $quantity, $variations);
+			$this->log_error('Product data prepared: ' . (is_wp_error($data) ? 'ERROR - ' . $data->get_error_message() : 'SUCCESS'));
+		}
+
+		// Check for errors
+		if (is_wp_error($data)) {
+			$this->log_error('Data preparation error: ' . $data->get_error_message());
+			$debug_info['error'] = 'Data preparation error: ' . $data->get_error_message();
+			$this->send_json_response(false, $data->get_error_message(), ['debug' => $debug_info]);
+		}
+
+		if (empty($data) || ! is_array($data)) {
+			$this->log_error('Data is empty or not an array');
+			$debug_info['error'] = 'Data empty or invalid';
+			$this->send_json_response(false, 'Unable to retrieve product data', ['debug' => $debug_info]);
+		}
+
+		$this->log_error('Data validation passed, generating message...');
+
+		// Generate message
+		$message = $this->plugin->generate_message($context, $data);
+		if (empty($message)) {
+			$this->log_error('Message generation failed');
+			$debug_info['error'] = 'Message generation failed';
+			$this->send_json_response(false, 'Unable to generate message', ['debug' => $debug_info]);
+		}
+
+		$this->log_error('Message generated successfully, getting WhatsApp URL...');
+
+		// Get WhatsApp URL
+		$url = $this->plugin->get_whatsapp_url($message);
+
+		// Fallback URL
+		if (empty($url)) {
+			$url = 'https://wa.me/?text=' . rawurlencode($message);
+		}
+
+		$this->log_error('WhatsApp URL generated: ' . $url);
+		$this->log_error('=== AJAX REQUEST END - SUCCESS ===');
+
+		$debug_info['success'] = true;
+		$debug_info['url_length'] = strlen($url);
+		$debug_info['message_length'] = strlen($message);
+
+		// Return success
+		$this->send_json_response(true, 'Success', ['url' => $url, 'message' => $message, 'debug' => $debug_info]);
+
+		} catch (Exception $e) {
+			$this->log_error('=== AJAX REQUEST END - EXCEPTION ===');
+			$this->log_error('Exception: ' . $e->getMessage());
+			$this->log_error('Stack trace: ' . $e->getTraceAsString());
+			$debug_info['exception'] = $e->getMessage();
+			$this->send_json_response(false, 'Exception: ' . $e->getMessage(), ['debug' => $debug_info]);
+		}
+	}		/**
 		 * Send JSON response and exit.
 		 *
 		 * @param bool   $success Success status.

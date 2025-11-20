@@ -493,6 +493,43 @@ function onlive_wa_block_redirect( $location, $status ) {
 }
 
 /**
+ * Directly handle our AJAX requests if WordPress hooks aren't firing.
+ * This is a fallback for servers where wp_ajax_* hooks don't work properly.
+ */
+function onlive_wa_direct_ajax_handler() {
+	// Check if this is our AJAX request
+	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
+		return;
+	}
+
+	// Check if it's an AJAX request
+	$is_ajax = ! empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && 'xmlhttprequest' === strtolower( $_SERVER['HTTP_X_REQUESTED_WITH'] );
+	if ( ! $is_ajax ) {
+		return;
+	}
+
+	// Log that we're handling this directly
+	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler triggered for action: ' . $action );
+
+	// Get the frontend instance and call the handler directly
+	$plugin = onlive_wa_order_pro();
+	if ( $plugin && $plugin->frontend ) {
+		if ( 'vaog2jucg3f2' === $action ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ajax_message directly' );
+			$plugin->frontend->handle_ajax_message();
+		} elseif ( 'onlive_wa_ping' === $action ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ping directly' );
+			$plugin->frontend->handle_ping();
+		}
+		exit; // Exit after handling to prevent further processing
+	}
+}
+
+// Hook into wp_loaded to catch AJAX requests that might not trigger wp_ajax_* hooks
+add_action( 'wp_loaded', 'onlive_wa_direct_ajax_handler', 999 );
+
+/**
  * Debug all admin-ajax requests to see what's happening.
  */
 function onlive_wa_debug_ajax_requests() {
