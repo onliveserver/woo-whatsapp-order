@@ -606,8 +606,20 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 * @param string $message Response message.
 		 * @param array  $data    Additional data.
 		 */
-		private function send_json_response($success, $message, $data = [])
+		public function send_json_response($success, $message, $data = [])
 		{
+			// Clear all output buffers to ensure clean JSON response
+			while (ob_get_level() > 0) {
+				ob_end_clean();
+			}
+
+			// Set proper headers
+			header('Content-Type: application/json; charset=UTF-8', true);
+			header('Cache-Control: no-cache, no-store, must-revalidate', true);
+			header('Pragma: no-cache', true);
+			header('Expires: 0', true);
+
+			// Ensure success is boolean
 			$response = [
 				'success' => (bool) $success,
 				'message' => $message,

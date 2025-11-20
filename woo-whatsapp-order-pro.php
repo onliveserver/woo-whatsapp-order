@@ -509,12 +509,33 @@ function onlive_wa_direct_ajax_handler() {
 		return;
 	}
 
-	// Log that we're handling this directly
-	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler triggered for action: ' . $action );
+	// Set DOING_AJAX constant if not already set
+	if ( ! defined( 'DOING_AJAX' ) ) {
+		define( 'DOING_AJAX', true );
+	}
 
-	// Get the frontend instance and call the handler directly
-	$plugin = onlive_wa_order_pro();
-	if ( $plugin && $plugin->frontend ) {
+	try {
+		// Log that we're handling this directly
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler triggered for action: ' . $action );
+
+		// Get the plugin instance
+		$plugin = onlive_wa_order_pro();
+		
+		if ( ! $plugin ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Plugin instance is null' );
+			http_response_code( 500 );
+			echo wp_json_encode( [ 'success' => false, 'message' => 'Plugin not initialized' ] );
+			exit;
+		}
+
+		if ( ! $plugin->frontend ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Frontend instance is null' );
+			http_response_code( 500 );
+			echo wp_json_encode( [ 'success' => false, 'message' => 'Frontend not initialized' ] );
+			exit;
+		}
+
+		// Call the appropriate handler
 		if ( 'vaog2jucg3f2' === $action ) {
 			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ajax_message directly' );
 			$plugin->frontend->handle_ajax_message();
@@ -522,7 +543,17 @@ function onlive_wa_direct_ajax_handler() {
 			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ping directly' );
 			$plugin->frontend->handle_ping();
 		}
-		exit; // Exit after handling to prevent further processing
+
+		// If we get here, the handler didn't exit properly
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] WARNING: Handler did not exit' );
+		exit;
+
+	} catch ( Exception $e ) {
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR in direct AJAX handler: ' . $e->getMessage() );
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Stack trace: ' . $e->getTraceAsString() );
+		http_response_code( 500 );
+		echo wp_json_encode( [ 'success' => false, 'message' => 'Server error: ' . $e->getMessage() ] );
+		exit;
 	}
 }
 
