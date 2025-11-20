@@ -30,6 +30,11 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		{
 			$this->plugin = $plugin;
 
+			// Log frontend initialization
+			$this->log_error('=== FRONTEND CLASS CONSTRUCTOR START ===');
+			$this->log_error('Plugin enabled: ' . ($this->plugin->is_enabled() ? 'YES' : 'NO'));
+			$this->log_error('WooCommerce active: ' . ($this->plugin->is_woocommerce_active() ? 'YES' : 'NO'));
+
 			add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
 			add_action('wp_head', [$this, 'output_custom_css']);
 
@@ -37,6 +42,7 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			// Use priority 0 to execute before other hooks
 			add_action('wp_ajax_vaog2jucg3f2', [$this, 'handle_ajax_message'], 0);
 			add_action('wp_ajax_nopriv_vaog2jucg3f2', [$this, 'handle_ajax_message'], 0);
+			$this->log_error('AJAX handlers registered for action: vaog2jucg3f2');
 
 			// Prevent redirects during AJAX requests - hook very early
 			add_action('plugins_loaded', [$this, 'prevent_ajax_redirect'], -999);
@@ -47,6 +53,8 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 
 			add_action('woocommerce_after_add_to_cart_button', [$this, 'render_single_button'], 21);
 			add_action('woocommerce_proceed_to_checkout', [$this, 'render_cart_button'], 25);
+
+			$this->log_error('=== FRONTEND CLASS CONSTRUCTOR COMPLETE ===');
 		}
 
 		/**
@@ -169,8 +177,13 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		public function enqueue_assets()
 		{
 			if (! $this->plugin->is_enabled() || ! $this->plugin->is_woocommerce_active()) {
+				$this->log_error('Assets not enqueued - plugin disabled or WooCommerce inactive');
 				return;
 			}
+
+			$this->log_error('=== ENQUEUEING ASSETS ===');
+			$this->log_error('Current page is product: ' . (is_product() ? 'YES' : 'NO'));
+			$this->log_error('Current page is cart: ' . (is_cart() ? 'YES' : 'NO'));
 
 			$settings = $this->plugin->get_settings();
 
@@ -181,6 +194,7 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 					[],
 					$this->plugin->version
 				);
+				$this->log_error('CSS enqueued');
 			}
 
 			wp_enqueue_script(
@@ -190,25 +204,31 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				$this->plugin->version,
 				true
 			);
+			$this->log_error('JavaScript enqueued');
+
+			$localized_data = [
+				'ajaxUrl'   => admin_url('admin-ajax.php'),
+				'nonce'     => wp_create_nonce('onlive-wa-order'),
+				'phone'     => $this->plugin->get_setting('phone', ''),
+				'buttonSize' => $this->plugin->get_setting('button_size', 'medium'),
+				'colors'    => [
+					'background' => $this->plugin->get_setting('button_color', '#25D366'),
+					'text'       => $this->plugin->get_setting('button_text_color', '#ffffff'),
+				],
+				'strings'   => [
+					'phoneMissing' => __('Please add your WhatsApp number in the plugin settings.', 'onlive-wa-order'),
+					'error'        => __('Unable to build the WhatsApp message. Please try again.', 'onlive-wa-order'),
+				],
+			];
 
 			wp_localize_script(
 				'onlive-wa-order-frontend',
 				'onliveWAOrder',
-				[
-					'ajaxUrl'   => admin_url('admin-ajax.php'),
-					'nonce'     => wp_create_nonce('onlive-wa-order'),
-					'phone'     => $this->plugin->get_setting('phone', ''),
-					'buttonSize' => $this->plugin->get_setting('button_size', 'medium'),
-					'colors'    => [
-						'background' => $this->plugin->get_setting('button_color', '#25D366'),
-						'text'       => $this->plugin->get_setting('button_text_color', '#ffffff'),
-					],
-					'strings'   => [
-						'phoneMissing' => __('Please add your WhatsApp number in the plugin settings.', 'onlive-wa-order'),
-						'error'        => __('Unable to build the WhatsApp message. Please try again.', 'onlive-wa-order'),
-					],
-				]
+				$localized_data
 			);
+
+			$this->log_error('JavaScript localized with data: ' . json_encode($localized_data));
+			$this->log_error('=== ASSETS ENQUEUE COMPLETE ===');
 		}
 
 		/**

@@ -120,14 +120,24 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 	public function bootstrap() {
 		$this->settings = $this->get_settings();
 
+		// Log bootstrap start
+		error_log('=== PLUGIN BOOTSTRAP START ===');
+		error_log('Is admin: ' . (is_admin() ? 'YES' : 'NO'));
+		error_log('Is WooCommerce active: ' . ($this->is_woocommerce_active() ? 'YES' : 'NO'));
+		error_log('Plugin enabled: ' . ($this->is_enabled() ? 'YES' : 'NO'));
+
 		if ( is_admin() ) {
 			$this->admin = new Onlive_WA_Order_Pro_Admin( $this );
+			error_log('Admin class initialized');
 		}
 
 		$this->frontend = new Onlive_WA_Order_Pro_Frontend( $this );
+		error_log('Frontend class initialized');
 
 		// Initialize GitHub updater.
 		new Onlive_WA_Order_GitHub_Updater( __FILE__ );
+		error_log('GitHub updater initialized');
+		error_log('=== PLUGIN BOOTSTRAP COMPLETE ===');
 	}		/**
 		 * Show notice if WooCommerce is inactive.
 		 */
