@@ -52,11 +52,7 @@
 		event.preventDefault();
 
 		var $button = $(this);
-		if (!onliveWAOrder.phone) {
-			window.alert(onliveWAOrder.strings.phoneMissing);
-			return;
-		}
-
+		
 		var payload = getPayload($button);
 		
 		// Add loading state to button
