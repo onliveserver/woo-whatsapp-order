@@ -43,6 +43,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_action( 'wp_ajax_4fuqubimzid9', [ $this, 'ajax_force_reinstall' ] );
 			add_action( 'wp_ajax_m2g5mq19kf2s', [ $this, 'ajax_auto_install_update' ] );
 			add_filter( 'plugin_action_links_' . plugin_basename( ONLIVE_WA_ORDER_FILE ), [ $this, 'add_plugin_action_links' ] );
+
+			// Refresh plugin settings when options are updated by the settings API.
+			add_action( 'update_option_' . $this->option_name, [ $this->plugin, 'refresh_settings' ], 10, 3 );
 		}
 
 		/**
@@ -97,11 +100,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_settings_field( 'template_toggle', __( 'Custom template', 'onlive-wa-order' ), [ $this, 'field_template_toggle' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
 			add_settings_field( 'message_template', __( 'Template builder', 'onlive-wa-order' ), [ $this, 'field_message_template' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
 			add_settings_field( 'template_preview', __( 'Live preview', 'onlive-wa-order' ), [ $this, 'field_template_preview' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
-
-			add_settings_section( 'onlive_wa_order_api', __( 'WhatsApp API Settings', 'onlive-wa-order' ), '__return_false', 'onlive-wa-order-api' );
-			add_settings_field( 'api_choice', __( 'Sending system', 'onlive-wa-order' ), [ $this, 'field_api_choice' ], 'onlive-wa-order-api', 'onlive_wa_order_api' );
-			add_settings_field( 'custom_gateway', __( 'Custom gateway URL', 'onlive-wa-order' ), [ $this, 'field_custom_gateway' ], 'onlive-wa-order-api', 'onlive_wa_order_api' );
-			add_settings_field( 'custom_query', __( 'Custom query parameter', 'onlive-wa-order' ), [ $this, 'field_custom_query' ], 'onlive-wa-order-api', 'onlive_wa_order_api' );
 
 			add_settings_section( 'onlive_wa_order_design', __( 'Design Settings', 'onlive-wa-order' ), '__return_false', 'onlive-wa-order-design' );
 			add_settings_field( 'load_css', __( 'Plugin styles', 'onlive-wa-order' ), [ $this, 'field_load_css' ], 'onlive-wa-order-design', 'onlive_wa_order_design' );
@@ -261,7 +259,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				'general' => __( 'General Settings', 'onlive-wa-order' ),
 				'button'  => __( 'Button Settings', 'onlive-wa-order' ),
 				'template'=> __( 'Template Builder', 'onlive-wa-order' ),
-				'api'     => __( 'WhatsApp API', 'onlive-wa-order' ),
 				'design'  => __( 'Design Settings', 'onlive-wa-order' ),
 				'updates' => __( 'Updates', 'onlive-wa-order' ),
 			];
@@ -410,40 +407,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			<?php
 		}
 
-		public function field_api_choice() {
-			$current = $this->option( 'api_choice', 'wa' );
-			$options = [
-				'wa'     => __( 'wa.me short link', 'onlive-wa-order' ),
-				'api'    => __( 'api.whatsapp.com', 'onlive-wa-order' ),
-				'custom' => __( 'Custom gateway URL', 'onlive-wa-order' ),
-			];
-			foreach ( $options as $value => $label ) :
-				?>
-				<label>
-					<input type="radio" name="<?php echo esc_attr( $this->option_name ); ?>[api_choice]" value="<?php echo esc_attr( $value ); ?>" <?php checked( $current, $value ); ?> />
-					<?php echo esc_html( $label ); ?>
-				</label>
-				<br />
-				<?php
-			endforeach;
-			?><p class="description"><?php esc_html_e( 'Select which WhatsApp endpoint to use when opening messages.', 'onlive-wa-order' ); ?></p><?php
-		}
 
-		public function field_custom_gateway() {
-			$value = $this->option( 'custom_gateway', '' );
-			?>
-			<input type="url" class="regular-text" name="<?php echo esc_attr( $this->option_name ); ?>[custom_gateway]" value="<?php echo esc_attr( $value ); ?>" placeholder="https://example.com/send" />
-			<p class="description"><?php esc_html_e( 'Provide the base URL for your custom gateway if selected above.', 'onlive-wa-order' ); ?></p>
-			<?php
-		}
-
-		public function field_custom_query() {
-			$value = $this->option( 'custom_query_param', 'text' );
-			?>
-			<input type="text" class="regular-text" name="<?php echo esc_attr( $this->option_name ); ?>[custom_query_param]" value="<?php echo esc_attr( $value ); ?>" />
-			<p class="description"><?php esc_html_e( 'Name of the query parameter used by the custom gateway for the message text.', 'onlive-wa-order' ); ?></p>
-			<?php
-		}
 
 		public function field_load_css() {
 			$enabled = (bool) $this->option( 'load_css', true );
@@ -469,21 +433,25 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$clean    = wp_unslash( (array) $input );
 			$output   = $this->plugin->get_settings();
 
+			// Log the sanitization process for debugging
+
 			if ( isset( $clean['enabled'] ) ) {
 				$output['enabled'] = ! empty( $clean['enabled'] ) ? 1 : 0;
 			}
 
-			if ( isset( $clean['phone'] ) ) {
-				$phone = sanitize_text_field( $clean['phone'] );
-				$phone = preg_replace( '/[^0-9\+]/', '', $phone );
-				if ( ! empty( $phone ) && ! preg_match( '/^\+?[0-9]{6,15}$/', $phone ) ) {
-					add_settings_error( $this->option_name, 'invalid_phone', __( 'Please enter a valid international WhatsApp number with country code.', 'onlive-wa-order' ) );
-				} else {
-					$output['phone'] = $phone;
-				}
+		if ( isset( $clean['phone'] ) ) {
+			$phone = sanitize_text_field( $clean['phone'] );
+			// Remove all non-digit and non-plus characters (spaces, dashes, etc.)
+			$phone = preg_replace( '/[^0-9\+]/', '', $phone );
+			// Validate: must have at least 6 digits after removing + (allowing up to 20 for international)
+			if ( ! empty( $phone ) && ! preg_match( '/^\+?[0-9]{6,20}$/', $phone ) ) {
+				add_settings_error( $this->option_name, 'invalid_phone', __( 'Please enter a valid international WhatsApp number with country code (6-20 digits).', 'onlive-wa-order' ) );
+				// Still save the phone even if validation fails, so user doesn't lose their input
+				$output['phone'] = $phone;
+			} else {
+				$output['phone'] = $phone;
 			}
-
-			if ( isset( $clean['positions'] ) ) {
+		}			if ( isset( $clean['positions'] ) ) {
 				$output['positions'] = [
 					'single' => ! empty( $clean['positions']['single'] ) ? 1 : 0,
 					'cart'   => ! empty( $clean['positions']['cart'] ) ? 1 : 0,
@@ -517,19 +485,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				$output['template_enabled'] = ! empty( $clean['template_enabled'] ) ? 1 : 0;
 			}
 			if ( isset( $clean['message_template'] ) ) {
-				// Use simple sanitization instead of wp_kses_post to avoid timeouts
 				$output['message_template'] = wp_strip_all_tags( (string) $clean['message_template'], true );
-			}
-
-			if ( isset( $clean['api_choice'] ) ) {
-				$api_choices = [ 'wa', 'api', 'custom' ];
-				$output['api_choice'] = in_array( $clean['api_choice'], $api_choices, true ) ? $clean['api_choice'] : $defaults['api_choice'];
-			}
-			if ( isset( $clean['custom_gateway'] ) ) {
-				$output['custom_gateway'] = esc_url_raw( $clean['custom_gateway'] );
-			}
-			if ( isset( $clean['custom_query_param'] ) ) {
-				$output['custom_query_param'] = sanitize_key( $clean['custom_query_param'] );
 			}
 
 			if ( isset( $clean['load_css'] ) ) {
@@ -539,8 +495,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				$output['custom_css'] = wp_strip_all_tags( $clean['custom_css'] );
 			}
 
-			$this->plugin->refresh_settings();
-
+			// Return the sanitized array. WordPress will store this via register_setting.
 			return $output;
 		}
 
@@ -761,9 +716,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				'include_product_link'  => '1',
 				'custom_template'       => '0',
 				'message_template'      => __( 'Hello, I am interested in {{product_name}} for {{product_price}}. Please let me know more details.', 'onlive-wa-order' ),
-				'api_choice'            => 'api',
-				'custom_gateway'        => '',
-				'custom_query'          => 'text',
 				'load_css'              => '1',
 				'custom_css'            => '',
 			];
@@ -881,7 +833,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 								<?php else : ?>
 									<span style="background: #4CAF50; color: white; padding: 3px 8px; border-radius: 3px; margin-left: 10px;"><?php esc_html_e( 'Up to Date', 'onlive-wa-order' ); ?></span>
 								<?php endif; ?>
-```							<?php endif; ?>
+							<?php endif; ?>
 						</td>
 					</tr>
 					<tr>

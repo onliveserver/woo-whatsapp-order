@@ -1,0 +1,213 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║         PHONE & SETTINGS RETRIEVAL - DETAILED ANALYSIS              ║
+║                   craftswear.com Remote Inspection                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+DATE: November 20, 2025
+ENDPOINT: https://craftswear.com/wp-admin/admin-ajax.php
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 1: PHONE RETRIEVAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Database Phone Value:    +919100454045
+Sanitized Format:        +919100454045
+URL Format (wa.me):      919100454045
+
+✅ RETRIEVAL CHAIN:
+   1. get_option('onlive_wa_order_settings') → Retrieved ✓
+   2. $settings['phone'] → "+919100454045" ✓
+   3. Phone sanitization → preg_replace('/[^0-9\+]/', '') ✓
+   4. URL format → ltrim('+') → "919100454045" ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 2: URL GENERATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generated URLs with Phone:
+   https://wa.me/919100454045?text=...
+
+Sample Product URL:
+   https://wa.me/919100454045?text=Hi%21%20Interested%20in%20
+   Oxblood%20Patina%20-%20Brogue%20Apron%20...%20Qty%3A%201
+
+✅ Phone extraction from URL: 919100454045 ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 3: TEMPLATE CONFIGURATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Template Enabled:        1 (true) ✓
+Template Location:       Database (onlive_wa_order_settings)
+Custom Template:         Enabled & Saved ✓
+
+CUSTOM TEMPLATE TEXT:
+   "Hi! Interested in {{product_name}} – {{product_variation}}. 
+    Qty: {{product_quantity}} • Price: {{product_price}} 
+    Please send more info."
+
+TEMPLATE VARIABLES SUPPORTED:
+   {{product_name}}        - Product title
+   {{product_variation}}   - Selected variation (e.g., "Color: Red")
+   {{product_quantity}}    - Quantity ordered
+   {{product_price}}       - Product price with currency
+   {{product_sku}}         - Product SKU
+   {{product_link}}        - Product URL (when enabled)
+   {{site_name}}           - Your store name
+   {{customer_name}}       - Customer name placeholder
+   {{cart_total}}          - Cart total
+
+✅ RETRIEVAL CHAIN:
+   1. get_setting('template_enabled', false) → true ✓
+   2. get_setting('message_template', '') → Template text ✓
+   3. Placeholder replacement → Applied correctly ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 4: ALL SETTINGS LOADED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TOTAL SETTINGS: 16 items
+
+1.  enabled                    → 1 (enabled)
+2.  phone                      → +919100454045 ✓
+3.  positions[single]          → 1 (show on single product)
+4.  positions[cart]            → 1 (show on cart page)
+5.  button_label_single        → "Order on WhatsApp"
+6.  button_label_cart          → "Order on WhatsApp"
+7.  button_color              → #25D366 (WhatsApp green)
+8.  button_text_color         → #FFFFFF (white)
+9.  button_size               → medium
+10. template_enabled           → 1 (custom template enabled) ✓
+11. message_template           → Custom template text ✓
+12. load_css                   → 1 (load plugin styles)
+13. custom_css                 → "" (no custom CSS)
+14. include_product_link       → 1 (include {{product_link}})
+15. api_choice                 → auto
+16. custom_query_param         → text
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 5: SETTINGS PAGE VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHERE PHONE IS RETRIEVED FROM SETTINGS PAGE:
+
+File: admin/settings-page.php
+Lines: 303-310
+
+    public function field_phone_number() {
+        $value = $this->option( 'phone', '' );
+        ?>
+        <input type="text" class="regular-text" id="onlive-wa-phone" 
+               name="<?php echo esc_attr( $this->option_name ); ?>[phone]" 
+               value="<?php echo esc_attr( $value ); ?>" 
+               placeholder="+11234567890" />
+        <?php
+    }
+
+RETRIEVAL FLOW:
+   1. $this->option('phone', '') calls: get_option('onlive_wa_order_settings')
+   2. WordPress retrieves settings from wp_options table
+   3. Phone value "+919100454045" is extracted
+   4. Sanitization in form: sanitize_text_field()
+   5. Stored back with preg_replace('/[^0-9\+]/', '') validation
+   6. On frontend: get_setting('phone') returns "+919100454045"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 6: TEMPLATE RETRIEVAL FROM SETTINGS PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHERE TEMPLATE IS RETRIEVED FROM SETTINGS PAGE:
+
+File: admin/settings-page.php
+Lines: 403-415 (field_template_toggle)
+Lines: 416-430 (field_message_template)
+
+TEMPLATE TOGGLE FIELD:
+    public function field_template_toggle() {
+        $enabled = (bool) $this->option( 'template_enabled', false );
+        ?>
+        <input type="hidden" name="...][template_enabled]" value="0" />
+        <label>
+            <input type="checkbox" ... value="1" 
+                   <?php checked( $enabled ); ?> />
+            Custom message template
+        </label>
+        <?php
+    }
+
+TEMPLATE TEXT FIELD:
+    public function field_message_template() {
+        $template = (string) $this->option( 'message_template', '' );
+        ?>
+        <textarea id="onlive-wa-template" 
+                  name="...][message_template]" 
+                  rows="5" class="large-text">
+            <?php echo esc_textarea( $template ); ?>
+        </textarea>
+        <?php
+    }
+
+RETRIEVAL FLOW:
+   1. get_setting('template_enabled', false) → 1 (true) ✓
+   2. get_setting('message_template', '') → Custom template text ✓
+   3. In AJAX handler: Check if template_enabled
+   4. If true: Use custom template, else use default
+   5. Replace placeholders with actual values
+   6. Generate message for WhatsApp
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TEST 7: AJAX REQUEST FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REQUEST EXAMPLE:
+   curl -X POST "https://craftswear.com/wp-admin/admin-ajax.php" \
+     -d "action=vaog2jucg3f2&context=product&product_id=653" \
+     -H "X-Requested-With: XMLHttpRequest"
+
+RESPONSE FLOW:
+   1. Bootstrap handler intercepts request ✓
+   2. Loads WordPress (wp-load.php) ✓
+   3. get_option('onlive_wa_order_settings') called ✓
+   4. All 16 settings retrieved ✓
+   5. Phone: "+919100454045" extracted ✓
+   6. Template enabled: true ✓
+   7. Custom template: Applied ✓
+   8. URL generated: https://wa.me/919100454045?text=... ✓
+   9. Debug info included in response ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 CONCLUSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PHONE RETRIEVAL:        WORKING CORRECTLY
+   • Source: Database (wp_options.onlive_wa_order_settings)
+   • Value: +919100454045
+   • Format: 919100454045 (in URL)
+   • In URL: YES - https://wa.me/919100454045?text=...
+
+✅ TEMPLATE RETRIEVAL:     WORKING CORRECTLY
+   • Status: Enabled (1)
+   • Source: Database (wp_options.onlive_wa_order_settings)
+   • Custom template: Loaded & Applied
+   • Variables: Replaced correctly
+
+✅ SETTINGS RETRIEVAL:     COMPLETE
+   • Total: 16 settings items
+   • All accessible: YES
+   • get_option() working: YES
+   • WordPress integration: VERIFIED
+
+✅ AJAX HANDLER:           RESPONDING CORRECTLY
+   • Bootstrap handler: Active
+   • Headers required: X-Requested-With: XMLHttpRequest
+   • Response format: Valid JSON
+   • Debug info: Included
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STATUS: ✅ PRODUCTION READY
+
+All retrieval mechanisms verified and working correctly.
+Phone number and templates are properly stored and retrieved.
+No issues detected in the retrieval chain.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

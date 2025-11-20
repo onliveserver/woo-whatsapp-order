@@ -1,11 +1,6 @@
 (function ($) {
 	'use strict';
 
-	console.log('=== WHATSAPP PLUGIN JS LOADED ===');
-	console.log('jQuery version:', $.fn.jquery);
-	console.log('Current page URL:', window.location.href);
-	console.log('onliveWAOrder object check:', typeof onliveWAOrder !== 'undefined' ? 'EXISTS' : 'MISSING');
-
 	/**
 	 * Extract variation attributes from form
 	 */
@@ -50,36 +45,16 @@
 		event.preventDefault();
 		var $button = $(this);
 
-		console.log('=== WHATSAPP BUTTON CLICK START ===');
-		console.log('Timestamp:', new Date().toISOString());
-		console.log('User logged in check:', typeof wp !== 'undefined' && wp.ajax && wp.ajax.settings && wp.ajax.settings.nonce ? 'YES' : 'UNKNOWN');
-		console.log('Button element:', $button);
-		console.log('Button data:', $button.data());
-		console.log('onliveWAOrder object exists:', typeof onliveWAOrder !== 'undefined');
-		if (typeof onliveWAOrder !== 'undefined') {
-			console.log('onliveWAOrder.ajaxUrl:', onliveWAOrder.ajaxUrl);
-			console.log('onliveWAOrder.nonce:', onliveWAOrder.nonce);
-		} else {
-			console.log('ERROR: onliveWAOrder object is undefined!');
-			showError('JavaScript configuration error - onliveWAOrder not loaded');
-			return;
-		}
-
 		// Show loading state
 		$button.prop('disabled', true);
 		var originalText = $button.html();
 		$button.html('⏳ Loading...');
 
 		var payload = getPayload($button);
-		console.log('Generated payload:', payload);
 
 		// Add nonce to payload
 		payload.nonce = onliveWAOrder.nonce;
-		console.log('Final AJAX payload:', payload);
-		console.log('AJAX URL:', onliveWAOrder.ajaxUrl);
 
-		// Send request
-		console.log('=== SENDING AJAX REQUEST ===');
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
@@ -87,73 +62,34 @@
 			dataType: 'json',
 
 			success: function (response) {
-				console.log('=== AJAX SUCCESS RESPONSE RECEIVED ===');
-				console.log('Raw response:', response);
-				console.log('Response success flag:', response.success);
-
-				if (response.success && response.data && response.data.url) {
-					console.log('Opening WhatsApp URL:', response.data.url);
-					window.open(response.data.url, '_blank');
+				if (response.success && response.url) {
+					// Redirect to WhatsApp URL
+					window.location.href = response.url;
+				} else if (response.success && response.data && response.data.url) {
+					// Fallback for old response format
+					window.location.href = response.data.url;
 				} else {
-					console.log('Response indicates failure or missing URL');
 					var errorMsg = response.message || 'An error occurred';
-					if (response.data && response.data.debug) {
-						console.log('Debug info from server:', response.data.debug);
-						errorMsg += '\n\nDebug Info:\n' + JSON.stringify(response.data.debug, null, 2);
-					}
 					showError(errorMsg);
 				}
 			},
 
 			error: function (xhr, status, error) {
-				console.log('=== AJAX ERROR OCCURRED ===');
-				console.log('XHR status:', xhr.status);
-				console.log('Status text:', status);
-				console.log('Error:', error);
-				console.log('Response headers:', xhr.getAllResponseHeaders());
-				console.log('Raw responseXML:', xhr.responseXML);
-				console.log('Raw responseText type:', typeof xhr.responseText);
-				console.log('Raw responseText length:', xhr.responseText ? xhr.responseText.length : 0);
-				console.log('Raw responseText preview (first 500 chars):', xhr.responseText ? xhr.responseText.substring(0, 500) : 'empty');
-
 				var errorMsg = 'Request failed - please try again';
 				if (xhr.responseText) {
-					console.log('Raw response text:', xhr.responseText);
 					try {
 						var response = JSON.parse(xhr.responseText);
-						console.log('Parsed error response:', response);
-						if (response.data && response.data.debug) {
-							console.log('Debug info from error response:', response.data.debug);
-							errorMsg += '\n\nDebug Info:\n' + JSON.stringify(response.data.debug, null, 2);
+						if (response.message) {
+							errorMsg = response.message;
 						}
 					} catch (e) {
-						console.log('Failed to parse response as JSON:', e);
-						console.log('Response appears to be HTML, checking for common issues...');
-						
-						// Check if it's a redirect or login page
-						if (xhr.responseText.includes('<html') && xhr.responseText.includes('redirect')) {
-							console.log('Response contains redirect HTML');
-							errorMsg += '\n\nServer Error: Request was redirected (check server logs)';
-						} else if (xhr.responseText.includes('login') || xhr.responseText.includes('wp-login')) {
-							console.log('Response contains login page HTML');
-							errorMsg += '\n\nServer Error: Authentication required';
-						} else if (xhr.responseText.length < 100) {
-							console.log('Response is very short, likely empty or error page');
-							errorMsg += '\n\nServer Error: Empty response from server';
-						} else {
-							console.log('Response is HTML but not recognized type');
-							errorMsg += '\n\nServer Response: ' + xhr.responseText.substring(0, 200) + '...';
-						}
+						// Response is not JSON, use default error message
 					}
-				} else {
-					console.log('No response text received');
-					errorMsg += '\n\nNo response from server';
 				}
 				showError(errorMsg);
 			},
 
 			complete: function () {
-				console.log('=== AJAX REQUEST COMPLETE ===');
 				// Restore button
 				$button.prop('disabled', false);
 				$button.html(originalText);
@@ -170,22 +106,7 @@
 
 	// Initialize on document ready
 	$(document).ready(function () {
-		console.log('=== DOCUMENT READY - ATTACHING WHATSAPP HANDLERS ===');
-		console.log('Looking for buttons with class: .onlive-wa-order-button');
-		var buttonCount = $('.onlive-wa-order-button').length;
-		console.log('Found', buttonCount, 'WhatsApp buttons on page');
-
-		if (buttonCount > 0) {
-			console.log('Buttons found:', $('.onlive-wa-order-button'));
-			$('.onlive-wa-order-button').each(function(index) {
-				console.log('Button', index + 1, 'data:', $(this).data());
-			});
-		} else {
-			console.log('WARNING: No WhatsApp buttons found on page!');
-		}
-
 		$(document).on('click', '.onlive-wa-order-button', handleClick);
-		console.log('Click handler attached to .onlive-wa-order-button');
 	});
 
 })(jQuery);

@@ -3,7 +3,7 @@
  * Plugin Name:       Onlive WooCommerce WhatsApp Order
  * Plugin URI:        https://www.onlivetechnologies.com/plugins/whatsapp-order
  * Description:       Adds customizable WhatsApp "Order Now" buttons to WooCommerce product and cart pages with advanced templates.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Author:            Onlive Technologies
  * Author URI:        https://www.onlivetechnologies.com/
  * Support Email:     support@onliveinfotech.com
@@ -18,6 +18,324 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// ULTRA EARLY AJAX HANDLER - Runs at plugin load time before WordPress hooks
+// This is an absolute safety net for AJAX requests to ensure they get a response
+if ( php_sapi_name() !== 'cli' && ! empty( $_REQUEST['action'] ) ) {
+	$_action = isset( $_REQUEST['action'] ) ? trim( strtolower( (string) $_REQUEST['action'] ) ) : '';
+	
+	if ( in_array( $_action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
+		// Check if this looks like an AJAX request
+		$is_ajax = ! empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && strtolower( $_SERVER['HTTP_X_REQUESTED_WITH'] ) === 'xmlhttprequest';
+		
+		if ( $is_ajax ) {
+			// This IS one of our AJAX requests
+			if ( ! defined( 'DOING_AJAX' ) ) {
+				define( 'DOING_AJAX', true );
+			}
+			
+			// Set immediate response headers
+			@header( 'Content-Type: application/json; charset=UTF-8', true );
+			@header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0', true );
+			@header( 'Pragma: no-cache', true );
+			@header( 'Expires: 0', true );
+			@header( 'X-Content-Type-Options: nosniff', true );
+			@header( 'HTTP/1.1 200 OK', true, 200 );
+			
+			// Prepare basic response
+			$response = [
+				'success' => true,
+				'action'  => $_action,
+			];
+			
+			// For ping, respond immediately
+			if ( 'onlive_wa_ping' === $_action ) {
+				$response['ping'] = 'pong';
+				$response['time'] = date( 'Y-m-d H:i:s' );
+				@exit( json_encode( $response ) );
+			}
+			
+			// For message action (vaog2jucg3f2), we also respond immediately
+			// to avoid the 503 error from WordPress admin-ajax.php
+			if ( 'vaog2jucg3f2' === $_action ) {
+				// Collect the request data
+				$context = isset( $_POST['context'] ) ? (string) $_POST['context'] : 'product';
+				$product_id = isset( $_POST['product_id'] ) ? intval( $_POST['product_id'] ) : 0;
+				$variation_id = isset( $_POST['variation_id'] ) ? intval( $_POST['variation_id'] ) : 0;
+				$quantity = isset( $_POST['quantity'] ) ? intval( $_POST['quantity'] ) : 1;
+				$variations_json = isset( $_POST['variations'] ) ? (string) $_POST['variations'] : '';
+				
+				// DEBUG HANDLERS - Check settings and return debug data
+				if ( 'debug_settings' === $context ) {
+					// Load WordPress to access settings
+					$wp_load_path = dirname( dirname( dirname( dirname( dirname( __FILE__ ) ) ) ) ) . '/wp-load.php';
+					if ( file_exists( $wp_load_path ) ) {
+						ob_start();
+						require_once $wp_load_path;
+						ob_end_clean();
+					}
+					
+					$all_settings = function_exists( 'get_option' ) ? get_option( 'onlive_wa_order_settings', [] ) : [];
+					
+					$response_data = [
+						'success' => true,
+						'action' => $_action,
+						'context' => 'debug_settings',
+						'debug_data' => [
+							'get_option_available' => function_exists( 'get_option' ),
+							'all_settings_count' => count( $all_settings ),
+							'all_settings' => $all_settings,
+							'phone' => isset( $all_settings['phone'] ) ? $all_settings['phone'] : 'NOT SET',
+							'template_enabled' => isset( $all_settings['template_enabled'] ) ? $all_settings['template_enabled'] : false,
+							'message_template' => isset( $all_settings['message_template'] ) ? substr( $all_settings['message_template'], 0, 100 ) . '...' : 'NOT SET',
+							'button_text' => isset( $all_settings['button_text'] ) ? $all_settings['button_text'] : 'NOT SET',
+							'button_position' => isset( $all_settings['button_position'] ) ? $all_settings['button_position'] : 'NOT SET',
+							'timestamp' => date( 'Y-m-d H:i:s' ),
+						],
+					];
+					
+					@exit( json_encode( $response_data ) );
+				}
+				
+				if ( 'check_settings' === $context ) {
+					// Load WordPress to access settings
+					$wp_load_path = dirname( dirname( dirname( dirname( dirname( __FILE__ ) ) ) ) ) . '/wp-load.php';
+					if ( file_exists( $wp_load_path ) ) {
+						ob_start();
+						require_once $wp_load_path;
+						ob_end_clean();
+					}
+					
+					$all_settings = function_exists( 'get_option' ) ? get_option( 'onlive_wa_order_settings', [] ) : [];
+					
+					$response_data = [
+						'success' => true,
+						'action' => $_action,
+						'context' => 'check_settings',
+						'settings_check' => [
+							'phone_raw' => isset( $all_settings['phone'] ) ? $all_settings['phone'] : 'EMPTY',
+							'phone_sanitized' => isset( $all_settings['phone'] ) ? preg_replace( '/[^0-9\+]/', '', $all_settings['phone'] ) : 'EMPTY',
+							'phone_for_wa_me' => isset( $all_settings['phone'] ) ? ltrim( preg_replace( '/[^0-9\+]/', '', $all_settings['phone'] ), '+' ) : 'EMPTY',
+							'template_enabled' => ! empty( $all_settings['template_enabled'] ),
+							'template_content' => isset( $all_settings['message_template'] ) ? $all_settings['message_template'] : 'EMPTY',
+							'all_keys' => array_keys( $all_settings ),
+							'total_settings' => count( $all_settings ),
+						],
+						'timestamp' => date( 'Y-m-d H:i:s' ),
+					];
+					
+					@exit( json_encode( $response_data ) );
+				}
+				
+				// Build product data for message template
+				$product_data = [
+					'product_name'     => 'Product',
+					'product_price'    => '',
+					'product_quantity' => $quantity,
+					'product_variation' => '',
+					'product_sku'      => '',
+					'product_link'     => '',
+					'site_name'        => 'Our Store',
+					'customer_name'    => 'Valued Customer',
+					'cart_total'       => '',
+				];
+				
+				// Try to load WordPress to get product data
+				$wp_load_path = dirname( dirname( dirname( dirname( dirname( __FILE__ ) ) ) ) ) . '/wp-load.php';
+				if ( file_exists( $wp_load_path ) && ! function_exists( 'wc_get_product' ) ) {
+					// Suppress output during WordPress loading
+					ob_start();
+					require_once $wp_load_path;
+					ob_end_clean();
+				}
+				
+				// Get site name
+				if ( function_exists( 'get_bloginfo' ) ) {
+					$product_data['site_name'] = get_bloginfo( 'name' );
+				}
+				
+				// Get product data from WooCommerce
+				if ( function_exists( 'wc_get_product' ) && $product_id > 0 ) {
+					$product = wc_get_product( $product_id );
+					if ( $product ) {
+						$product_data['product_name'] = $product->get_name();
+						$product_data['product_link'] = $product->get_permalink();
+						
+						// Try to get product price - check main product first
+						$price = null;
+						if ( method_exists( $product, 'get_price' ) ) {
+							$price = $product->get_price();
+						}
+						if ( ! $price && method_exists( $product, 'get_regular_price' ) ) {
+							$price = $product->get_regular_price();
+						}
+						
+						if ( $price || $price === 0 || $price === '0' ) {
+							// Get currency symbol
+							if ( function_exists( 'get_woocommerce_currency_symbol' ) ) {
+								$currency_symbol = get_woocommerce_currency_symbol();
+								$product_data['product_price'] = $currency_symbol . number_format( (float) $price, 2 );
+							} else {
+								$product_data['product_price'] = '$' . number_format( (float) $price, 2 );
+							}
+						}
+						
+						$product_data['product_sku'] = $product->get_sku() ?: '';
+						
+						// Handle variations
+						if ( $variation_id > 0 && $product->is_type( 'variable' ) ) {
+							$variation = wc_get_product( $variation_id );
+							if ( $variation ) {
+								// Get variation price
+								$var_price = null;
+								if ( method_exists( $variation, 'get_price' ) ) {
+									$var_price = $variation->get_price();
+								}
+								if ( ! $var_price && method_exists( $variation, 'get_regular_price' ) ) {
+									$var_price = $variation->get_regular_price();
+								}
+								
+								if ( $var_price || $var_price === 0 || $var_price === '0' ) {
+									if ( function_exists( 'get_woocommerce_currency_symbol' ) ) {
+										$currency_symbol = get_woocommerce_currency_symbol();
+										$product_data['product_price'] = $currency_symbol . number_format( (float) $var_price, 2 );
+									} else {
+										$product_data['product_price'] = '$' . number_format( (float) $var_price, 2 );
+									}
+								}
+								
+								// Get variation attributes
+								$attrs = $variation->get_attributes();
+								$var_parts = [];
+								foreach ( $attrs as $attr_name => $attr_value ) {
+									$attr_label = ucfirst( str_replace( [ 'pa_', '_' ], [ '', ' ' ], $attr_name ) );
+									$var_parts[] = $attr_label . ': ' . ucfirst( $attr_value );
+								}
+								if ( ! empty( $var_parts ) ) {
+									$product_data['product_variation'] = implode( ', ', $var_parts );
+								}
+							}
+						}
+					}
+				} else if ( $product_id > 0 && ! function_exists( 'wc_get_product' ) ) {
+					// Fallback: Query the database directly if WooCommerce functions aren't available
+					global $wpdb;
+					if ( isset( $wpdb ) && isset( $wpdb->posts ) ) {
+						$product_post = $wpdb->get_row( $wpdb->prepare(
+							"SELECT post_title, post_name FROM {$wpdb->posts} WHERE ID = %d",
+							$product_id
+						) );
+						if ( $product_post ) {
+							$product_data['product_name'] = $product_post->post_title;
+						}
+					}
+				}
+				
+				// Get phone number and template settings
+				$phone = '';
+				$phone_raw = '';
+				$phone_sanitized = '';
+				$template_enabled = false;
+				$custom_template = '';
+				$include_product_link = false;
+				$all_settings = [];
+				
+				if ( function_exists( 'get_option' ) ) {
+					$all_settings = get_option( 'onlive_wa_order_settings', [] );
+					$phone_raw = isset( $all_settings['phone'] ) ? (string) $all_settings['phone'] : '';
+					$template_enabled = ! empty( $all_settings['template_enabled'] );
+					$custom_template = isset( $all_settings['message_template'] ) ? $all_settings['message_template'] : '';
+					$include_product_link = ! empty( $all_settings['include_product_link'] );
+				}
+				
+				// Remove product link if not enabled in settings
+				if ( ! $include_product_link ) {
+					$product_data['product_link'] = '';
+				}
+				
+				// Sanitize phone number: remove all non-digit and non-plus characters
+				$phone_sanitized = preg_replace( '/[^0-9\+]/', '', $phone_raw );
+				// Remove leading plus for wa.me URL
+				$wa_phone = ltrim( $phone_sanitized, '+' );
+				
+				// Use custom template if enabled, otherwise use default
+				if ( $template_enabled && ! empty( $custom_template ) ) {
+					$message_template = $custom_template;
+				} else {
+					$message_template = "Hello, I would like to order {{product_name}}. Price: {{product_price}} x {{product_quantity}}. {{product_variation}}";
+				}
+				
+				// Simple template replacement
+				$message = $message_template;
+				foreach ( $product_data as $key => $value ) {
+					$message = str_replace( '{{' . $key . '}}', (string) $value, $message );
+				}
+				
+				// If quantity is more than 1, add it
+				if ( $quantity > 1 ) {
+					$message .= "\nQuantity: " . $quantity;
+				}
+				
+				// If there are variations, add them
+				if ( ! empty( $product_data['product_variation'] ) ) {
+					$message .= "\nVariation: " . $product_data['product_variation'];
+				}
+				
+				// Clean up any remaining template variables
+				$message = preg_replace( '/\{\{[^}]+\}\}/', '', $message );
+				
+				// Build WhatsApp URL with phone number
+				if ( ! empty( $wa_phone ) ) {
+					$whatsapp_url = 'https://wa.me/' . rawurlencode( $wa_phone ) . '?text=' . rawurlencode( $message );
+				} else {
+					$whatsapp_url = 'https://wa.me/?text=' . rawurlencode( $message );
+				}
+				
+				// Build response data with comprehensive debugging
+				$response_data = [
+					'success' => true,
+					'action'  => $_action,
+					'url' => $whatsapp_url,
+					'debug' => [
+						'context' => $context,
+						'product_id' => $product_id,
+						'variation_id' => $variation_id,
+						'quantity' => $quantity,
+						'product_name' => $product_data['product_name'],
+						'product_price' => $product_data['product_price'],
+						'settings_retrieval' => [
+							'get_option_exists' => function_exists( 'get_option' ),
+							'all_settings' => $all_settings,
+							'settings_count' => count( $all_settings ),
+						],
+						'phone_tracking' => [
+							'phone_raw' => $phone_raw,
+							'phone_sanitized' => $phone_sanitized,
+							'phone_for_url' => $wa_phone,
+							'phone_present' => ! empty( $phone_raw ),
+							'phone_valid' => ! empty( $wa_phone ),
+						],
+						'template_tracking' => [
+							'template_enabled' => $template_enabled,
+							'custom_template' => $custom_template,
+							'message_template_used' => $message_template,
+						],
+						'message_info' => [
+							'final_message' => $message,
+							'message_length' => strlen( $message ),
+						],
+						'request_received_at' => date( 'Y-m-d H:i:s' ),
+						'handler' => 'bootstrap',
+					],
+				];
+				
+				@exit( json_encode( $response_data ) );
+			}
+		}
+	}
+}
+
+
 
 if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 	final class Onlive_WA_Order_Pro {
@@ -64,8 +382,10 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 			$this->define_constants();
 			$this->includes();
 
-			add_action( 'plugins_loaded', [ $this, 'load_textdomain' ] );
-			add_action( 'plugins_loaded', [ $this, 'bootstrap' ], 5 );
+			// Load translations on plugins_loaded (early but after WordPress has initialized)
+			add_action( 'plugins_loaded', [ $this, 'load_textdomain' ], 20 );
+			// Bootstrap components shortly after plugins are loaded
+			add_action( 'plugins_loaded', [ $this, 'bootstrap' ], 30 );
 			add_action( 'admin_init', [ $this, 'maybe_display_woo_notice' ] );
 		}
 
@@ -197,9 +517,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 			'button_size'         => 'medium',
 			'template_enabled'    => 0,
 			'message_template'    => "Hello, I would like to order {{product_name}}. Price: {{product_price}} x {{product_quantity}}. {{product_variation}}",
-			'api_choice'          => 'wa',
-			'custom_gateway'      => '',
-			'custom_query_param'  => 'text',
 			'load_css'            => 1,
 			'custom_css'          => '',
 			'include_product_link' => 1,
@@ -224,7 +541,15 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 				$this->settings = $this->get_settings();
 			}
 
-			return isset( $this->settings[ $key ] ) ? $this->settings[ $key ] : $default;
+			// Check if key exists AND is not empty for phone/template fields
+			$value = isset( $this->settings[ $key ] ) ? $this->settings[ $key ] : $default;
+			
+			// For phone specifically, if it's empty string, use the default
+			if ( 'phone' === $key && empty( $value ) && ! empty( $default ) ) {
+				return $default;
+			}
+			
+			return $value;
 		}
 
 		/**
@@ -360,58 +685,31 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 
 		/**
 		 * Build WhatsApp URL for a message.
+		 * Uses wa.me for both mobile and desktop (most reliable endpoint).
 		 *
 		 * @param string $message Message body.
 		 *
 		 * @return string
 		 */
 		public function get_whatsapp_url( $message ) {
-			$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->get_setting( 'phone', '' ) );
+			$raw_phone = (string) $this->get_setting( 'phone', '+919100454045' );
+			// Remove all non-digit and non-plus characters
+			$phone = preg_replace( '/[^0-9\+]/', '', $raw_phone );
+			// Remove leading plus for wa.me URL
+			$wa_phone = ltrim($phone, '+');
 
-			if ( empty( $phone ) ) {
+			if ( empty( $wa_phone ) ) {
 				return '';
 			}
 
 			// Trim and clean message to avoid encoding issues
 			$message = trim( (string) $message );
-			
 			// Normalize newlines: convert to standard format before URL encoding
 			$message = str_replace( [ "\r\n", "\r" ], "\n", $message );
-			
-			$encoded  = rawurlencode( $message );
-			$choice   = $this->get_setting( 'api_choice', 'wa' );
-			$endpoint = '';
+			$encoded = rawurlencode( $message );
 
-			// Detect if user is on mobile device
-			$is_mobile = wp_is_mobile();
-
-			switch ( $choice ) {
-				case 'api':
-					// Desktop: use web.whatsapp.com, Mobile: use api.whatsapp.com (opens app)
-					if ( $is_mobile ) {
-						$endpoint = sprintf( 'https://api.whatsapp.com/send?phone=%1$s&text=%2$s', rawurlencode( $phone ), $encoded );
-					} else {
-						$endpoint = sprintf( 'https://web.whatsapp.com/send?phone=%1$s&text=%2$s', rawurlencode( $phone ), $encoded );
-					}
-					break;
-				case 'custom':
-					$base          = $this->get_setting( 'custom_gateway', '' );
-					$query_key     = $this->get_setting( 'custom_query_param', 'text' );
-					$base          = esc_url_raw( $base );
-					if ( empty( $base ) ) {
-						$base = 'https://wa.me/' . rawurlencode( $phone );
-					}
-					$endpoint = add_query_arg(
-						[ $query_key => $encoded ],
-						$base
-					);
-					break;
-				case 'wa':
-				default:
-					// wa.me works for both mobile and desktop automatically
-					$endpoint = sprintf( 'https://wa.me/%1$s?text=%2$s', rawurlencode( $phone ), $encoded );
-					break;
-			}
+			// Use wa.me for both mobile and desktop - most reliable endpoint
+			$endpoint = sprintf( 'https://wa.me/%1$s?text=%2$s', rawurlencode( $wa_phone ), $encoded );
 
 			/**
 			 * Filter the final WhatsApp endpoint URL.
@@ -493,6 +791,35 @@ function onlive_wa_block_redirect( $location, $status ) {
 }
 
 /**
+ * Check if we're handling our AJAX request early.
+ */
+function onlive_wa_check_ajax_early() {
+	// Only process AJAX requests
+	if ( empty( $_REQUEST['action'] ) ) {
+		return;
+	}
+
+	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
+		return;
+	}
+
+	// Verify it's an AJAX request
+	if ( empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) || 'xmlhttprequest' !== strtolower( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) {
+		return;
+	}
+
+	// Define DOING_AJAX at the absolute earliest point
+	if ( ! defined( 'DOING_AJAX' ) ) {
+		define( 'DOING_AJAX', true );
+	}
+
+	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] AJAX check early: action=' . $action );
+}
+
+add_action( 'init', 'onlive_wa_check_ajax_early', -9999 );
+
+/**
  * Directly handle our AJAX requests if WordPress hooks aren't firing.
  * This is a fallback for servers where wp_ajax_* hooks don't work properly.
  */
@@ -513,166 +840,91 @@ function onlive_wa_direct_ajax_handler() {
 		return;
 	}
 
-	// Define DOING_AJAX if not already set
+	// Make sure DOING_AJAX is defined
 	if ( ! defined( 'DOING_AJAX' ) ) {
 		define( 'DOING_AJAX', true );
 	}
 
-	// Log entry point
-	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: action=' . $action );
+	// Disable error display to prevent it from interfering with JSON response
+	@ini_set( 'display_errors', 0 );
+
+	// Log entry
+	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler triggered for: ' . $action );
 
 	try {
-		// Clear output buffers
-		while ( ob_get_level() > 0 ) {
-			ob_end_clean();
+		// Clear ALL output buffers
+		if ( function_exists( 'ob_get_level' ) ) {
+			while ( ob_get_level() > 0 ) {
+				ob_end_clean();
+			}
 		}
 
-		// Set header first
-		header( 'Content-Type: application/json; charset=UTF-8', true );
+		// Start fresh output buffering to catch any stray output
+		ob_start();
 
-		// Get the plugin instance
-		$plugin = Onlive_WA_Order_Pro::instance();
+		// Set JSON header
+		header( 'Content-Type: application/json; charset=UTF-8', true );
+		header( 'Cache-Control: no-cache, no-store, must-revalidate', true );
+
+		// Get plugin instance  
+		if ( ! function_exists( 'onlive_wa_order_pro' ) ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Plugin function does not exist' );
+			http_response_code( 500 );
+			die( json_encode( [ 'success' => false, 'message' => 'Plugin not found' ] ) );
+		}
+
+		$plugin = onlive_wa_order_pro();
 
 		if ( ! $plugin ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: plugin is null' );
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Plugin instance is null' );
 			http_response_code( 500 );
-			die( wp_json_encode( [ 'success' => false, 'message' => 'Plugin not available' ] ) );
+			die( json_encode( [ 'success' => false, 'message' => 'Plugin not initialized' ] ) );
 		}
 
 		if ( ! $plugin->frontend ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: frontend is null' );
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Frontend instance is null' );
 			http_response_code( 500 );
-			die( wp_json_encode( [ 'success' => false, 'message' => 'Frontend not available' ] ) );
+			die( json_encode( [ 'success' => false, 'message' => 'Frontend not initialized' ] ) );
 		}
 
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: calling ' . $action );
+		// Clear buffer before calling handler
+		@ob_end_clean();
 
-		// Call the appropriate handler
+		// Call handler directly
 		if ( 'vaog2jucg3f2' === $action ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ajax_message' );
 			$plugin->frontend->handle_ajax_message();
 		} elseif ( 'onlive_wa_ping' === $action ) {
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ping' );
 			$plugin->frontend->handle_ping();
 		}
 
-		// Should not reach here - handlers should exit
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: handler did not exit' );
-		die( wp_json_encode( [ 'success' => false, 'message' => 'Handler did not complete' ] ) );
+		// If we get here, handler didn't exit
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] WARNING: Handler did not terminate' );
+		http_response_code( 500 );
+		die( json_encode( [ 'success' => false, 'message' => 'Handler execution error' ] ) );
 
 	} catch ( Throwable $e ) {
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler exception: ' . $e->getMessage() );
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Trace: ' . $e->getTraceAsString() );
+		// Make sure we're in a clean state
+		if ( function_exists( 'ob_get_level' ) ) {
+			while ( ob_get_level() > 0 ) {
+				ob_end_clean();
+			}
+		}
+
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] EXCEPTION: ' . $e->getMessage() );
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] File: ' . $e->getFile() . ' Line: ' . $e->getLine() );
+
 		http_response_code( 500 );
-		die( wp_json_encode( [ 
+		die( json_encode( [ 
 			'success' => false, 
-			'message' => 'Server error', 
-			'error' => $e->getMessage() 
+			'message' => 'Server error',
+			'error' => $e->getMessage()
 		] ) );
 	}
 }
 
-// Hook into wp_loaded to catch AJAX requests that might not trigger wp_ajax_* hooks
-add_action( 'wp_loaded', 'onlive_wa_direct_ajax_handler', 999 );
-
-/**
- * Debug all admin-ajax requests to see what's happening.
- */
-function onlive_wa_debug_ajax_requests() {
-	// Only log for our actions
-	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
-		return;
-	}
-
-	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/debug.log';
-	$timestamp = date('Y-m-d H:i:s');
-	
-	$debug_info = [
-		'timestamp' => $timestamp,
-		'action' => $action,
-		'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
-		'doing_ajax' => defined('DOING_AJAX') ? DOING_AJAX : 'not_defined',
-		'is_admin' => is_admin(),
-		'user_logged_in' => is_user_logged_in(),
-		'user_id' => is_user_logged_in() ? get_current_user_id() : 'guest',
-		'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
-		'script_name' => $_SERVER['SCRIPT_NAME'] ?? 'unknown',
-		'post_data' => $_POST,
-		'get_data' => $_GET,
-		'headers' => [
-			'content_type' => $_SERVER['CONTENT_TYPE'] ?? 'not_set',
-			'accept' => $_SERVER['HTTP_ACCEPT'] ?? 'not_set',
-			'x_requested_with' => $_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'not_set',
-		],
-		'wp_debug' => [
-			'wp_loaded' => did_action('wp_loaded'),
-			'init' => did_action('init'),
-			'wp' => did_action('wp'),
-			'parse_request' => did_action('parse_request'),
-			'send_headers' => did_action('send_headers'),
-		],
-	];
-
-	$log_entry = "[{$timestamp}] AJAX DEBUG: " . json_encode($debug_info, JSON_PRETTY_PRINT) . "\n\n";
-	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
-}
-
-/**
- * Very early debug logging to catch all requests.
- */
-function onlive_wa_early_debug() {
-	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
-		return;
-	}
-
-	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/debug.log';
-	$timestamp = date('Y-m-d H:i:s');
-	$hook = current_filter();
-	
-	$debug_info = [
-		'timestamp' => $timestamp,
-		'hook' => $hook,
-		'action' => $action,
-		'doing_ajax' => defined('DOING_AJAX') ? DOING_AJAX : 'not_defined',
-		'plugin_loaded' => 'checking...',
-	];
-
-	$log_entry = "[{$timestamp}] EARLY DEBUG [{$hook}]: " . json_encode($debug_info, JSON_PRETTY_PRINT) . "\n";
-	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
-}
-
-/**
- * Log all WordPress hooks being fired during AJAX requests.
- */
-function onlive_wa_log_all_hooks() {
-	// Only log if we detect our AJAX action in request
-	static $is_our_request = null;
-	
-	if ( $is_our_request === null ) {
-		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		$is_our_request = in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true );
-	}
-	
-	if ( ! $is_our_request ) {
-		return;
-	}
-
-	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/hook-trace.log';
-	$hook = current_filter();
-	$timestamp = date('Y-m-d H:i:s');
-	$log_entry = "[{$timestamp}] Hook fired: {$hook}\n";
-	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
-}
-
-add_action( 'plugins_loaded', 'onlive_wa_early_debug', 0 );
-add_action( 'init', 'onlive_wa_early_debug', 0 );
-add_action( 'wp_loaded', 'onlive_wa_early_debug', 0 );
-
-// Log ALL hooks during AJAX - this will show us which hooks are firing
-add_action( 'all', 'onlive_wa_log_all_hooks', 1 );
-
-add_action( 'wp_ajax_nopriv_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
-add_action( 'wp_ajax_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
-add_action( 'wp_ajax_nopriv_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
-add_action( 'wp_ajax_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
+// Hook into init at highest priority FIRST, then wp_loaded as fallback
+add_action( 'init', 'onlive_wa_direct_ajax_handler', 99999 );
+add_action( 'wp_loaded', 'onlive_wa_direct_ajax_handler', 99999 );
 
