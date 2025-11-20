@@ -455,11 +455,17 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 	 * AJAX handler to build WhatsApp URL.
 	 */
 	public function handle_ajax_message() {
-		// Set JSON headers explicitly early - bypass LiteSpeed cache
+		// Ensure output buffering is clean
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+
+		// Set JSON headers explicitly FIRST - force override on LiteSpeed
 		header( 'Content-Type: application/json; charset=UTF-8', true );
-		header( 'Cache-Control: no-cache, no-store, must-revalidate', true );
+		header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0', true );
 		header( 'Pragma: no-cache', true );
-		header( 'Expires: 0', true );
+		header( 'Expires: Thu, 01 Jan 1970 00:00:00 GMT', true );
+		header( 'X-Content-Type-Options: nosniff', true );
 
 		try {
 			// Check if plugin is enabled
