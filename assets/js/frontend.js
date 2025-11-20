@@ -42,55 +42,31 @@
 	 * Handle button click
 	 */
 	function handleClick(event) {
-		if (typeof onliveWAOrder === 'undefined') {
-			alert('Plugin configuration error');
-			return;
-		}
-
 		event.preventDefault();
 		var $button = $(this);
 
 		// Show loading state
 		$button.prop('disabled', true);
 		var originalText = $button.html();
-		$button.html('<span style="display:inline-block; margin-right:5px;">⏳</span>Loading...');
+		$button.html('⏳ Loading...');
 
-		// Build and send request
+		// Send request
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
 			data: getPayload($button),
 			dataType: 'json',
-			timeout: 10000,
 
 			success: function (response) {
-				// Check response structure
-				if (!response || typeof response !== 'object') {
-					showError('Invalid response from server');
-					return;
-				}
-
-				// Success case
 				if (response.success && response.data && response.data.url) {
-					window.open(response.data.url, '_blank', 'noopener');
+					window.open(response.data.url, '_blank');
 				} else {
-					// Error case - use message from response
-					var errorMsg = response.message || (response.data && response.data.message) || 'An error occurred';
-					showError(errorMsg);
+					showError(response.message || 'An error occurred');
 				}
 			},
 
-			error: function (xhr, status, error) {
-				// Handle different error types
-				if (status === 'timeout') {
-					showError('Request timeout - please try again');
-				} else if (xhr.status === 0) {
-					showError('Network error - please check your connection');
-				} else if (xhr.responseJSON && xhr.responseJSON.message) {
-					showError(xhr.responseJSON.message);
-				} else {
-					showError('Request failed - please try again');
-				}
+			error: function () {
+				showError('Request failed - please try again');
 			},
 
 			complete: function () {
