@@ -161,17 +161,20 @@ if ( php_sapi_name() !== 'cli' && ! empty( $_REQUEST['action'] ) ) {
 						$product_data['product_name'] = $product->get_name();
 						$product_data['product_link'] = $product->get_permalink();
 						
-						// Try to get product price - check main product first
+						// Try to get product price - multiple fallbacks
 						$price = null;
 						if ( method_exists( $product, 'get_price' ) ) {
 							$price = $product->get_price();
 						}
-						if ( ! $price && method_exists( $product, 'get_regular_price' ) ) {
+						if ( ( $price === null || $price === '' || $price === false ) && method_exists( $product, 'get_regular_price' ) ) {
 							$price = $product->get_regular_price();
 						}
+						if ( ( $price === null || $price === '' || $price === false ) && method_exists( $product, 'get_sale_price' ) ) {
+							$price = $product->get_sale_price();
+						}
 						
-						if ( $price || $price === 0 || $price === '0' ) {
-							// Get currency symbol
+						// Format price if we have one
+						if ( $price !== null && $price !== '' && $price !== false ) {
 							if ( function_exists( 'get_woocommerce_currency_symbol' ) ) {
 								$currency_symbol = get_woocommerce_currency_symbol();
 								$product_data['product_price'] = $currency_symbol . number_format( (float) $price, 2 );
@@ -186,16 +189,20 @@ if ( php_sapi_name() !== 'cli' && ! empty( $_REQUEST['action'] ) ) {
 						if ( $variation_id > 0 && $product->is_type( 'variable' ) ) {
 							$variation = wc_get_product( $variation_id );
 							if ( $variation ) {
-								// Get variation price
+								// Get variation price with multiple fallbacks
 								$var_price = null;
 								if ( method_exists( $variation, 'get_price' ) ) {
 									$var_price = $variation->get_price();
 								}
-								if ( ! $var_price && method_exists( $variation, 'get_regular_price' ) ) {
+								if ( ( $var_price === null || $var_price === '' || $var_price === false ) && method_exists( $variation, 'get_regular_price' ) ) {
 									$var_price = $variation->get_regular_price();
 								}
+								if ( ( $var_price === null || $var_price === '' || $var_price === false ) && method_exists( $variation, 'get_sale_price' ) ) {
+									$var_price = $variation->get_sale_price();
+								}
 								
-								if ( $var_price || $var_price === 0 || $var_price === '0' ) {
+								// Format variation price if we have one
+								if ( $var_price !== null && $var_price !== '' && $var_price !== false ) {
 									if ( function_exists( 'get_woocommerce_currency_symbol' ) ) {
 										$currency_symbol = get_woocommerce_currency_symbol();
 										$product_data['product_price'] = $currency_symbol . number_format( (float) $var_price, 2 );
@@ -204,15 +211,20 @@ if ( php_sapi_name() !== 'cli' && ! empty( $_REQUEST['action'] ) ) {
 									}
 								}
 								
-								// Get variation attributes
+								// Get variation attributes - build clean attribute list
 								$attrs = $variation->get_attributes();
-								$var_parts = [];
-								foreach ( $attrs as $attr_name => $attr_value ) {
-									$attr_label = ucfirst( str_replace( [ 'pa_', '_' ], [ '', ' ' ], $attr_name ) );
-									$var_parts[] = $attr_label . ': ' . ucfirst( $attr_value );
-								}
-								if ( ! empty( $var_parts ) ) {
-									$product_data['product_variation'] = implode( ', ', $var_parts );
+								if ( $attrs && is_array( $attrs ) ) {
+									$var_parts = [];
+									foreach ( $attrs as $attr_name => $attr_value ) {
+										// Clean up attribute name: remove pa_ prefix and replace underscores with spaces
+										$attr_label = ucfirst( str_replace( [ 'pa_', '_' ], [ '', ' ' ], $attr_name ) );
+										// Capitalize attribute value
+										$clean_value = ucfirst( str_replace( '_', ' ', (string) $attr_value ) );
+										$var_parts[] = $attr_label . ': ' . $clean_value;
+									}
+									if ( ! empty( $var_parts ) ) {
+										$product_data['product_variation'] = implode( ', ', $var_parts );
+									}
 								}
 							}
 						}
