@@ -29,15 +29,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 			add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 			add_action( 'wp_head', [ $this, 'output_custom_css' ] );
-			add_action( 'init', [ $this, 'register_shortcode' ] );
-			add_action( 'init', [ $this, 'register_block' ] );
 			
 			// Register AJAX handlers with both logged-in and non-logged-in hooks
 			// Use priority 0 to execute before other hooks
 			add_action( 'wp_ajax_onlive_wa_build_message', [ $this, 'handle_ajax_message' ], 0 );
 			add_action( 'wp_ajax_nopriv_onlive_wa_build_message', [ $this, 'handle_ajax_message' ], 0 );
-			add_action( 'wp_ajax_onlive_wa_ping', [ $this, 'handle_ping' ], 0 );
-			add_action( 'wp_ajax_nopriv_onlive_wa_ping', [ $this, 'handle_ping' ], 0 );
 			
 			// Prevent redirects during AJAX requests - hook very early
 			add_action( 'plugins_loaded', [ $this, 'prevent_ajax_redirect' ], -999 );
@@ -112,7 +108,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 
 		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		return in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true );
+		return in_array( $action, [ 'onlive_wa_build_message' ], true );
 	}
 	
 	/**
@@ -130,7 +126,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 		
 		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		return in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true );
+		return in_array( $action, [ 'onlive_wa_build_message' ], true );
 	}		/**
 		 * Register AJAX handlers (backup).
 		 */
@@ -142,13 +138,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			if ( ! has_action( 'wp_ajax_nopriv_onlive_wa_build_message' ) ) {
 				add_action( 'wp_ajax_nopriv_onlive_wa_build_message', [ $this, 'handle_ajax_message' ] );
 			}
-		}
-
-		/**
-		 * AJAX handler for health check / ping.
-		 */
-		public function handle_ping() {
-			wp_send_json_success( [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ] );
 		}
 
 		/**
@@ -258,122 +247,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 
 		/**
-		 * Register shortcode.
-		 */
-		public function register_shortcode() {
-			add_shortcode( 'wa_order_button', [ $this, 'render_shortcode' ] );
-		}
-
-		/**
-		 * Shortcode renderer.
-		 *
-		 * @param array $atts Attributes.
-		 *
-		 * @return string
-		 */
-		public function render_shortcode( $atts ) {
-			$atts = shortcode_atts(
-				[
-					'id'     => 0,
-					'label'  => '',
-					'class'  => '',
-					'force'  => 'no',
-				],
-				$atts,
-				'wa_order_button'
-			);
-
-			$product_id = absint( $atts['id'] );
-			if ( ! $product_id && is_singular( 'product' ) ) {
-				$product_id = get_the_ID();
-			}
-
-			if ( ! $product_id ) {
-				return '';
-			}
-
-			$product = wc_get_product( $product_id );
-			if ( ! $product ) {
-				return '';
-			}
-
-			$disabled = get_post_meta( $product_id, '_onlive_wa_disable', true );
-			if ( 'yes' === $disabled && 'yes' !== strtolower( $atts['force'] ) ) {
-				return '';
-			}
-
-			return $this->get_button_markup(
-				$product,
-				'product',
-				[
-					'label' => $atts['label'],
-					'class' => $atts['class'] . ' via-shortcode',
-				]
-			);
-		}
-
-		/**
-		 * Register Gutenberg block.
-		 */
-		public function register_block() {
-			if ( ! function_exists( 'register_block_type' ) ) {
-				return;
-			}
-
-			wp_register_script(
-				'onlive-wa-order-block',
-				ONLIVE_WA_ORDER_URL . 'assets/js/block.js',
-				[ 'wp-blocks', 'wp-element', 'wp-components', 'wp-i18n', 'wp-editor' ],
-				$this->plugin->version,
-				true
-			);
-
-			register_block_type(
-				'onlive/wa-order-button',
-				[
-					'editor_script'   => 'onlive-wa-order-block',
-					'render_callback' => [ $this, 'render_block' ],
-					'attributes'      => [
-						'productId' => [ 'type' => 'integer', 'default' => 0 ],
-						'label'     => [ 'type' => 'string', 'default' => '' ],
-						'className' => [ 'type' => 'string', 'default' => '' ],
-					],
-				]
-			);
-		}
-
-		/**
-		 * Render Gutenberg block on frontend.
-		 *
-		 * @param array $attributes Block attributes.
-		 *
-		 * @return string
-		 */
-		public function render_block( $attributes ) {
-			$product_id = isset( $attributes['productId'] ) ? absint( $attributes['productId'] ) : 0;
-			$label      = isset( $attributes['label'] ) ? $attributes['label'] : '';
-			$class      = isset( $attributes['className'] ) ? $attributes['className'] : '';
-
-			if ( ! $product_id && is_singular( 'product' ) ) {
-				$product_id = get_the_ID();
-			}
-
-			$product = $product_id ? wc_get_product( $product_id ) : null;
-			if ( ! $product ) {
-				return '';
-			}
-
-			return $this->get_button_markup(
-				$product,
-				'product',
-				[
-					'label' => $label,
-					'class' => $class . ' via-block',
-				]
-			);
-		}
-
-		/**
 		 * Generate button markup.
 		 *
 		 * @param WC_Product|null $product Product instance.
@@ -462,16 +335,13 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 		// Force JSON response headers
 		header( 'Content-Type: application/json; charset=UTF-8', true );
-		header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0', true );
-		header( 'Pragma: no-cache', true );
-		header( 'Expires: 0', true );
 
-		// Verify plugin is enabled
+		// Check if plugin is enabled
 		if ( ! $this->plugin->is_enabled() ) {
 			$this->send_json_response( false, 'Plugin is disabled' );
 		}
 
-		// Get and validate context
+		// Get context
 		$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
 
 		// Prepare data
@@ -479,7 +349,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			$data = $this->prepare_cart_data();
 		} else {
 			$product_id = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
-			
+
 			if ( ! $product_id ) {
 				$this->send_json_response( false, 'Product ID is required' );
 			}
@@ -500,7 +370,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			$this->send_json_response( false, 'Unable to retrieve product data' );
 		}
 
-		// Generate WhatsApp message
+		// Generate message
 		$message = $this->plugin->generate_message( $context, $data );
 		if ( empty( $message ) ) {
 			$this->send_json_response( false, 'Unable to generate message' );
@@ -509,7 +379,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		// Get WhatsApp URL
 		$url = $this->plugin->get_whatsapp_url( $message );
 
-		// Fallback: Create wa.me URL if needed
+		// Fallback URL
 		if ( empty( $url ) ) {
 			$url = 'https://wa.me/?text=' . rawurlencode( $message );
 		}
