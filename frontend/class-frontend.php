@@ -148,9 +148,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		 * AJAX handler for health check / ping.
 		 */
 		public function handle_ping() {
-			// Simple debug - just echo text to see if this gets through
-			echo 'PING_OK_' . date( 'Y-m-d H:i:s' );
-			exit;
+			wp_send_json_success( [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ] );
 		}
 
 		/**
@@ -468,21 +466,13 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		header( 'Pragma: no-cache', true );
 		header( 'Expires: Thu, 01 Jan 1970 00:00:00 GMT', true );
 		header( 'X-Content-Type-Options: nosniff', true );
-		header( 'X-Handler: onlive-wa-order', true );
-
-		// Log that handler was called
-		file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Handler called\n", FILE_APPEND );
 
 		try {
 			// Check if plugin is enabled
 			if ( ! $this->plugin->is_enabled() ) {
-				$response = [ 'success' => false, 'data' => [ 'message' => 'Plugin is disabled' ] ];
-				file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Plugin disabled\n", FILE_APPEND );
-				echo wp_json_encode( $response );
+				echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Plugin is disabled' ] ] );
 				exit;
 			}
-
-			file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Plugin enabled\n", FILE_APPEND );
 
 			// Get context
 			$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
@@ -498,8 +488,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			} else {
 				// Validate product_id
 				if ( ! isset( $_POST['product_id'] ) || empty( $_POST['product_id'] ) ) {
-					$response = [ 'success' => false, 'data' => [ 'message' => 'Product ID is missing' ] ];
-					echo wp_json_encode( $response );
+					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Product ID is missing' ] ] );
 					exit;
 				}
 
@@ -515,13 +504,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 					}
 				}
 
-				file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Product ID: $product_id\n", FILE_APPEND );
-
 				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
 				if ( is_wp_error( $data ) ) {
-					$msg = $data->get_error_message();
-					file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Error: $msg\n", FILE_APPEND );
-					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => $msg ] ] );
+					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => $data->get_error_message() ] ] );
 					exit;
 				}
 			}
@@ -564,14 +549,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			}
 
 			// Send success response
-			file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Success response\n", FILE_APPEND );
 			echo wp_json_encode( [ 'success' => true, 'data' => [ 'url' => $url, 'message' => $message ] ] );
 			exit;
 			
 		} catch ( Exception $e ) {
-			$msg = $e->getMessage();
-			file_put_contents( WP_CONTENT_DIR . '/onlive-ajax-debug.log', date( 'Y-m-d H:i:s' ) . " - Exception: $msg\n", FILE_APPEND );
-			echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Error: ' . $msg ] ] );
+			echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Error: ' . $e->getMessage() ] ] );
 			exit;
 		}
 	}
