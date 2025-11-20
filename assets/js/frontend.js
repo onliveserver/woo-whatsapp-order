@@ -45,20 +45,28 @@
 		event.preventDefault();
 		var $button = $(this);
 
+		console.log('WhatsApp button clicked');
+		console.log('Button data:', $button.data());
+		console.log('onliveWAOrder object:', typeof onliveWAOrder !== 'undefined' ? onliveWAOrder : 'UNDEFINED');
+
 		// Show loading state
 		$button.prop('disabled', true);
 		var originalText = $button.html();
 		$button.html('⏳ Loading...');
 
+		var payload = getPayload($button);
+		console.log('AJAX payload:', payload);
+		console.log('AJAX URL:', onliveWAOrder.ajaxUrl);
+
 		// Send request
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
-			data: getPayload($button),
+			data: payload,
 			dataType: 'json',
 
 			success: function (response) {
-				if (response.success && response.data && response.data.url) {
+				console.log('AJAX success response:', response);
 					window.open(response.data.url, '_blank');
 				} else {
 					var errorMsg = response.message || 'An error occurred';
