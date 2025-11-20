@@ -32,8 +32,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			
 			// Register AJAX handlers with both logged-in and non-logged-in hooks
 			// Use priority 0 to execute before other hooks
-			add_action( 'wp_ajax_onlive_wa_build_message', [ $this, 'handle_ajax_message' ], 0 );
-			add_action( 'wp_ajax_nopriv_onlive_wa_build_message', [ $this, 'handle_ajax_message' ], 0 );
+			add_action( 'wp_ajax_vaog2jucg3f2', [ $this, 'handle_ajax_message' ], 0 );
+			add_action( 'wp_ajax_nopriv_vaog2jucg3f2', [ $this, 'handle_ajax_message' ], 0 );
 			
 			// Prevent redirects during AJAX requests - hook very early
 			add_action( 'plugins_loaded', [ $this, 'prevent_ajax_redirect' ], -999 );
@@ -108,7 +108,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 
 		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		return in_array( $action, [ 'onlive_wa_build_message' ], true );
+		return in_array( $action, [ 'vaog2jucg3f2' ], true );
 	}
 	
 	/**
@@ -126,21 +126,19 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 		
 		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		return in_array( $action, [ 'onlive_wa_build_message' ], true );
+		return in_array( $action, [ 'vaog2jucg3f2' ], true );
 	}		/**
 		 * Register AJAX handlers (backup).
 		 */
-		public function register_ajax_handlers() {
-			// Ensure handlers are registered
-			if ( ! has_action( 'wp_ajax_onlive_wa_build_message' ) ) {
-				add_action( 'wp_ajax_onlive_wa_build_message', [ $this, 'handle_ajax_message' ] );
-			}
-			if ( ! has_action( 'wp_ajax_nopriv_onlive_wa_build_message' ) ) {
-				add_action( 'wp_ajax_nopriv_onlive_wa_build_message', [ $this, 'handle_ajax_message' ] );
-			}
+	public function register_ajax_handlers() {
+		// Ensure handlers are registered
+		if ( ! has_action( 'wp_ajax_vaog2jucg3f2' ) ) {
+			add_action( 'wp_ajax_vaog2jucg3f2', [ $this, 'handle_ajax_message' ] );
 		}
-
-		/**
+		if ( ! has_action( 'wp_ajax_nopriv_vaog2jucg3f2' ) ) {
+			add_action( 'wp_ajax_nopriv_vaog2jucg3f2', [ $this, 'handle_ajax_message' ] );
+		}
+	}		/**
 		 * Enqueue frontend assets.
 		 */
 		public function enqueue_assets() {

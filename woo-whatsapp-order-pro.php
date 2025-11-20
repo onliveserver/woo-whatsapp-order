@@ -449,7 +449,7 @@ if ( ! function_exists( 'onlive_wa_prevent_ajax_redirects' ) ) {
 		}
 		
 		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-		if ( ! in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true ) ) {
+		if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
 			return;
 		}
 		
@@ -475,7 +475,7 @@ if ( ! function_exists( 'onlive_wa_prevent_ajax_redirects' ) ) {
  */
 function onlive_wa_block_redirect( $location, $status ) {
 	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-	if ( in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true ) ) {
+	if ( in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
 		// Return false to prevent the redirect
 		return false;
 	}

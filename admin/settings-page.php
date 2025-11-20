@@ -39,9 +39,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 			add_action( 'add_meta_boxes', [ $this, 'register_product_metabox' ] );
 			add_action( 'save_post_product', [ $this, 'save_product_metabox' ] );
-			add_action( 'wp_ajax_onlive_wa_check_updates', [ $this, 'ajax_check_updates' ] );
-			add_action( 'wp_ajax_onlive_wa_force_reinstall', [ $this, 'ajax_force_reinstall' ] );
-			add_action( 'wp_ajax_onlive_wa_auto_install_update', [ $this, 'ajax_auto_install_update' ] );
+			add_action( 'wp_ajax_qh475wxmarq1', [ $this, 'ajax_check_updates' ] );
+			add_action( 'wp_ajax_4fuqubimzid9', [ $this, 'ajax_force_reinstall' ] );
+			add_action( 'wp_ajax_m2g5mq19kf2s', [ $this, 'ajax_auto_install_update' ] );
 			add_filter( 'plugin_action_links_' . plugin_basename( ONLIVE_WA_ORDER_FILE ), [ $this, 'add_plugin_action_links' ] );
 		}
 
@@ -883,7 +883,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 							type: 'POST',
 							url: onliveWAAdmin.ajax_url,
 							data: {
-								action: 'onlive_wa_check_updates',
+								action: 'qh475wxmarq1',
 								nonce: onliveWAAdmin.nonce
 							},
 							success: function(response) {
@@ -912,7 +912,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 							type: 'POST',
 							url: onliveWAAdmin.ajax_url,
 							data: {
-								action: 'onlive_wa_force_reinstall',
+								action: '4fuqubimzid9',
 								nonce: onliveWAAdmin.nonce
 							},
 							success: function(response) {
@@ -946,7 +946,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 							type: 'POST',
 							url: onliveWAAdmin.ajax_url,
 							data: {
-								action: 'onlive_wa_auto_install_update',
+								action: 'm2g5mq19kf2s',
 								nonce: onliveWAAdmin.nonce
 							},
 							success: function(response) {

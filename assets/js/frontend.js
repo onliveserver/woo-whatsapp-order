@@ -23,7 +23,7 @@
 	function getPayload($button) {
 		var context = $button.data('context') || 'product';
 		var payload = {
-			action: 'onlive_wa_build_message',
+			action: 'vaog2jucg3f2',
 			context: context
 		};
 
