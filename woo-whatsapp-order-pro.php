@@ -3,7 +3,7 @@
  * Plugin Name:       Onlive WooCommerce WhatsApp Order
  * Plugin URI:        https://www.onlivetechnologies.com/plugins/whatsapp-order
  * Description:       Adds customizable WhatsApp "Order Now" buttons to WooCommerce product and cart pages with advanced templates.
- * Version:           1.3.0
+ * Version:           1.4.0
  * Author:            Onlive Technologies
  * Author URI:        https://www.onlivetechnologies.com/
  * Support Email:     support@onliveinfotech.com
@@ -34,7 +34,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 		 *
 		 * @var string
 		 */
-		public $version = '1.3.0';
+		public $version = '1.4.0';
 
 		/**
 		 * Cached settings array.

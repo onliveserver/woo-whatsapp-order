@@ -1,3 +1,16 @@
+# [1.4.0] - 2025-11-20
+
+### Security
+- **Randomized AJAX action names**: Replaced all descriptive AJAX action names with random alphanumeric strings for better security against automated scanning and exploitation.
+
+### Changed
+- **Updated GitHub repository references**: Changed from onlive-technologies/onlive-whatsapp-order-pro to onliveserver/woo-whatsapp-order
+- **Enhanced admin panel**: Added plugin settings link in Plugins page and last update check timestamp display
+
+### Added
+- **Plugin action links**: Direct "Settings" link now available in WordPress Plugins page
+- **Update check history**: Admin panel now shows when updates were last checked
+
 # [1.3.0] - 2025-11-20
 
 ### Changed

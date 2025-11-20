@@ -3,7 +3,7 @@ Contributors: onlive
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,6 +37,12 @@ Yes. Selected variation attributes are automatically included in the WhatsApp me
 Yes. Use the Design tab to disable the default stylesheet and paste custom CSS.
 
 == Changelog ==
+= 1.4.0 =
+* Security enhancement: Randomized AJAX action names for better protection
+* Updated GitHub repository references
+* Added plugin settings link in Plugins page
+* Enhanced admin panel with last update check timestamp
+
 = 1.3.0 =
 * Removed all authentication (nonce) from WhatsApp message AJAX handler for universal guest/user support
 * Improved error handling and admin Force Reinstall tool

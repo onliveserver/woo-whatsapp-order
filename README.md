@@ -1,6 +1,6 @@
 # Onlive WooCommerce WhatsApp Order
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/onliveserver/woo-whatsapp-order)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/onliveserver/woo-whatsapp-order)
 [![WordPress](https://img.shields.io/badge/wordpress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![WooCommerce](https://img.shields.io/badge/woocommerce-5.0%2B-purple.svg)](https://woocommerce.com/)
 [![PHP](https://img.shields.io/badge/php-7.4%2B-green.svg)](https://php.net/)
