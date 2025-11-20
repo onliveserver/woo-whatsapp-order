@@ -497,63 +497,76 @@ function onlive_wa_block_redirect( $location, $status ) {
  * This is a fallback for servers where wp_ajax_* hooks don't work properly.
  */
 function onlive_wa_direct_ajax_handler() {
-	// Check if this is our AJAX request
-	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	// Only process on AJAX requests to our endpoints
+	if ( empty( $_REQUEST['action'] ) ) {
+		return;
+	}
+
+	$action = sanitize_key( wp_unslash( $_REQUEST['action'] ) );
 	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
 		return;
 	}
 
-	// Check if it's an AJAX request
+	// Verify this is an AJAX request
 	$is_ajax = ! empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && 'xmlhttprequest' === strtolower( $_SERVER['HTTP_X_REQUESTED_WITH'] );
 	if ( ! $is_ajax ) {
 		return;
 	}
 
-	// Set DOING_AJAX constant if not already set
+	// Define DOING_AJAX if not already set
 	if ( ! defined( 'DOING_AJAX' ) ) {
 		define( 'DOING_AJAX', true );
 	}
 
+	// Log entry point
+	error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: action=' . $action );
+
 	try {
-		// Log that we're handling this directly
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler triggered for action: ' . $action );
+		// Clear output buffers
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+
+		// Set header first
+		header( 'Content-Type: application/json; charset=UTF-8', true );
 
 		// Get the plugin instance
-		$plugin = onlive_wa_order_pro();
-		
+		$plugin = Onlive_WA_Order_Pro::instance();
+
 		if ( ! $plugin ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Plugin instance is null' );
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: plugin is null' );
 			http_response_code( 500 );
-			echo wp_json_encode( [ 'success' => false, 'message' => 'Plugin not initialized' ] );
-			exit;
+			die( wp_json_encode( [ 'success' => false, 'message' => 'Plugin not available' ] ) );
 		}
 
 		if ( ! $plugin->frontend ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR: Frontend instance is null' );
+			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: frontend is null' );
 			http_response_code( 500 );
-			echo wp_json_encode( [ 'success' => false, 'message' => 'Frontend not initialized' ] );
-			exit;
+			die( wp_json_encode( [ 'success' => false, 'message' => 'Frontend not available' ] ) );
 		}
+
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: calling ' . $action );
 
 		// Call the appropriate handler
 		if ( 'vaog2jucg3f2' === $action ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ajax_message directly' );
 			$plugin->frontend->handle_ajax_message();
 		} elseif ( 'onlive_wa_ping' === $action ) {
-			error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Calling handle_ping directly' );
 			$plugin->frontend->handle_ping();
 		}
 
-		// If we get here, the handler didn't exit properly
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] WARNING: Handler did not exit' );
-		exit;
+		// Should not reach here - handlers should exit
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler: handler did not exit' );
+		die( wp_json_encode( [ 'success' => false, 'message' => 'Handler did not complete' ] ) );
 
-	} catch ( Exception $e ) {
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] ERROR in direct AJAX handler: ' . $e->getMessage() );
-		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Stack trace: ' . $e->getTraceAsString() );
+	} catch ( Throwable $e ) {
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Direct AJAX handler exception: ' . $e->getMessage() );
+		error_log( '[' . date( 'Y-m-d H:i:s' ) . '] Trace: ' . $e->getTraceAsString() );
 		http_response_code( 500 );
-		echo wp_json_encode( [ 'success' => false, 'message' => 'Server error: ' . $e->getMessage() ] );
-		exit;
+		die( wp_json_encode( [ 
+			'success' => false, 
+			'message' => 'Server error', 
+			'error' => $e->getMessage() 
+		] ) );
 	}
 }
 
