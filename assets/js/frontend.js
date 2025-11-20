@@ -111,6 +111,10 @@
 				console.log('Status text:', status);
 				console.log('Error:', error);
 				console.log('Response headers:', xhr.getAllResponseHeaders());
+				console.log('Raw responseXML:', xhr.responseXML);
+				console.log('Raw responseText type:', typeof xhr.responseText);
+				console.log('Raw responseText length:', xhr.responseText ? xhr.responseText.length : 0);
+				console.log('Raw responseText preview (first 500 chars):', xhr.responseText ? xhr.responseText.substring(0, 500) : 'empty');
 
 				var errorMsg = 'Request failed - please try again';
 				if (xhr.responseText) {
@@ -124,10 +128,26 @@
 						}
 					} catch (e) {
 						console.log('Failed to parse response as JSON:', e);
-						errorMsg += '\n\nServer Response: ' + xhr.responseText;
+						console.log('Response appears to be HTML, checking for common issues...');
+						
+						// Check if it's a redirect or login page
+						if (xhr.responseText.includes('<html') && xhr.responseText.includes('redirect')) {
+							console.log('Response contains redirect HTML');
+							errorMsg += '\n\nServer Error: Request was redirected (check server logs)';
+						} else if (xhr.responseText.includes('login') || xhr.responseText.includes('wp-login')) {
+							console.log('Response contains login page HTML');
+							errorMsg += '\n\nServer Error: Authentication required';
+						} else if (xhr.responseText.length < 100) {
+							console.log('Response is very short, likely empty or error page');
+							errorMsg += '\n\nServer Error: Empty response from server';
+						} else {
+							console.log('Response is HTML but not recognized type');
+							errorMsg += '\n\nServer Response: ' + xhr.responseText.substring(0, 200) + '...';
+						}
 					}
 				} else {
 					console.log('No response text received');
+					errorMsg += '\n\nNo response from server';
 				}
 				showError(errorMsg);
 			},

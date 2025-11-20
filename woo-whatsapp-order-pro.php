@@ -492,3 +492,51 @@ function onlive_wa_block_redirect( $location, $status ) {
 	return $location;
 }
 
+/**
+ * Debug all admin-ajax requests to see what's happening.
+ */
+function onlive_wa_debug_ajax_requests() {
+	// Only log for our actions
+	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
+		return;
+	}
+
+	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/debug.log';
+	$timestamp = date('Y-m-d H:i:s');
+	
+	$debug_info = [
+		'timestamp' => $timestamp,
+		'action' => $action,
+		'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+		'doing_ajax' => defined('DOING_AJAX') ? DOING_AJAX : 'not_defined',
+		'is_admin' => is_admin(),
+		'user_logged_in' => is_user_logged_in(),
+		'user_id' => is_user_logged_in() ? get_current_user_id() : 'guest',
+		'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+		'script_name' => $_SERVER['SCRIPT_NAME'] ?? 'unknown',
+		'post_data' => $_POST,
+		'get_data' => $_GET,
+		'headers' => [
+			'content_type' => $_SERVER['CONTENT_TYPE'] ?? 'not_set',
+			'accept' => $_SERVER['HTTP_ACCEPT'] ?? 'not_set',
+			'x_requested_with' => $_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'not_set',
+		],
+		'wp_debug' => [
+			'wp_loaded' => did_action('wp_loaded'),
+			'init' => did_action('init'),
+			'wp' => did_action('wp'),
+			'parse_request' => did_action('parse_request'),
+			'send_headers' => did_action('send_headers'),
+		],
+	];
+
+	$log_entry = "[{$timestamp}] AJAX DEBUG: " . json_encode($debug_info, JSON_PRETTY_PRINT) . "\n\n";
+	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+}
+add_action( 'admin_init', 'onlive_wa_debug_ajax_requests', 1 );
+add_action( 'wp_ajax_nopriv_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
+add_action( 'wp_ajax_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
+add_action( 'wp_ajax_nopriv_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
+add_action( 'wp_ajax_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
+
