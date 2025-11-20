@@ -534,7 +534,35 @@ function onlive_wa_debug_ajax_requests() {
 	$log_entry = "[{$timestamp}] AJAX DEBUG: " . json_encode($debug_info, JSON_PRETTY_PRINT) . "\n\n";
 	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
 }
-add_action( 'admin_init', 'onlive_wa_debug_ajax_requests', 1 );
+
+/**
+ * Very early debug logging to catch all requests.
+ */
+function onlive_wa_early_debug() {
+	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	if ( ! in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true ) ) {
+		return;
+	}
+
+	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/debug.log';
+	$timestamp = date('Y-m-d H:i:s');
+	$hook = current_filter();
+	
+	$debug_info = [
+		'timestamp' => $timestamp,
+		'hook' => $hook,
+		'action' => $action,
+		'doing_ajax' => defined('DOING_AJAX') ? DOING_AJAX : 'not_defined',
+		'plugin_loaded' => 'checking...',
+	];
+
+	$log_entry = "[{$timestamp}] EARLY DEBUG [{$hook}]: " . json_encode($debug_info, JSON_PRETTY_PRINT) . "\n";
+	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+}
+
+add_action( 'plugins_loaded', 'onlive_wa_early_debug', 0 );
+add_action( 'init', 'onlive_wa_early_debug', 0 );
+add_action( 'wp_loaded', 'onlive_wa_early_debug', 0 );
 add_action( 'wp_ajax_nopriv_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
 add_action( 'wp_ajax_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
 add_action( 'wp_ajax_nopriv_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
