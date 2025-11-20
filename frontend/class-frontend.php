@@ -383,10 +383,6 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
 				'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
 				'action' => $_REQUEST['action'] ?? 'none',
-				'is_user_logged_in' => is_user_logged_in(),
-				'wc_initialized' => function_exists('WC'),
-				'wc_session_exists' => function_exists('WC') && WC()->session,
-				'wc_cart_exists' => function_exists('WC') && WC()->cart,
 			];
 
 			try {
