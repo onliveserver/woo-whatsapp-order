@@ -759,7 +759,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				return $cached;
 			}
 
-			$url = 'https://api.github.com/repos/onliveserver/onlive-whatsapp-order/releases/latest';
+			$url = 'https://api.github.com/repos/onliveserver/woo-whatsapp-order/tags';
 
 			$response = wp_remote_get(
 				$url,
@@ -789,12 +789,26 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$body = wp_remote_retrieve_body( $response );
 			$data = json_decode( $body );
 
-			if ( empty( $data->tag_name ) ) {
+			if ( ! is_array( $data ) || empty( $data ) ) {
+				return new WP_Error( 'no_tags', __( 'Could not retrieve repository tags.', 'onlive-wa-order' ) );
+			}
+
+			// Find the latest tag by comparing versions
+			$latest_version = '0.0.0';
+			foreach ( $data as $tag ) {
+				if ( isset( $tag->name ) ) {
+					$tag_version = ltrim( $tag->name, 'v' );
+					if ( version_compare( $tag_version, $latest_version, '>' ) ) {
+						$latest_version = $tag_version;
+					}
+				}
+			}
+
+			if ( $latest_version === '0.0.0' ) {
 				return new WP_Error( 'no_version', __( 'Could not determine remote version.', 'onlive-wa-order' ) );
 			}
 
-			// Remove 'v' prefix if present
-			$version = ltrim( $data->tag_name, 'v' );
+			$version = $latest_version;
 
 			// Cache for 1 hour
 			set_transient( $cache_key, $version, HOUR_IN_SECONDS );
@@ -985,23 +999,39 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		}
 
 		$response = wp_remote_get(
-			'https://api.github.com/repos/onliveserver/woo-whatsapp-order/releases/latest',
+			'https://api.github.com/repos/onliveserver/woo-whatsapp-order/tags',
 			[ 'timeout' => 10 ]
-		);			if ( is_wp_error( $response ) ) {
-				return $response;
+		);
+		
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body );
+
+		if ( ! $data || ! is_array( $data ) || empty( $data ) ) {
+			return new WP_Error( 'no_tags', __( 'Could not retrieve repository tags.', 'onlive-wa-order' ) );
+		}
+
+		// Find the latest tag by comparing versions
+		$latest_version = '0.0.0';
+		foreach ( $data as $tag ) {
+			if ( isset( $tag->name ) ) {
+				$tag_version = ltrim( $tag->name, 'v' );
+				if ( version_compare( $tag_version, $latest_version, '>' ) ) {
+					$latest_version = $tag_version;
+				}
 			}
+		}
 
-			$body = wp_remote_retrieve_body( $response );
-			$data = json_decode( $body );
+		if ( $latest_version === '0.0.0' ) {
+			return new WP_Error( 'no_version', __( 'Could not determine remote version.', 'onlive-wa-order' ) );
+		}
 
-			if ( ! $data || ! isset( $data->tag_name ) ) {
-				return new WP_Error( 'no_version', __( 'Could not determine remote version.', 'onlive-wa-order' ) );
-			}
+		set_transient( $cache_key, $latest_version, HOUR_IN_SECONDS );
 
-			$version = ltrim( $data->tag_name, 'v' );
-			set_transient( $cache_key, $version, HOUR_IN_SECONDS );
-
-			return $version;
+		return $latest_version;
 		}
 	}
 }
