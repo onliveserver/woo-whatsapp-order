@@ -257,21 +257,36 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		public function render_single_button()
 		{
+			$this->log_error('=== RENDER SINGLE BUTTON CHECK ===');
+			$this->log_error('Plugin enabled: ' . ($this->plugin->is_enabled() ? 'YES' : 'NO'));
+			$this->log_error('Should render single: ' . ($this->plugin->should_render_button('single') ? 'YES' : 'NO'));
+			$this->log_error('Is product page: ' . (is_product() ? 'YES' : 'NO'));
+
 			if (! $this->plugin->is_enabled() || ! $this->plugin->should_render_button('single')) {
+				$this->log_error('Single button not rendered - plugin disabled or not configured for single pages');
 				return;
 			}
 
 			global $product;
+			$this->log_error('Global $product exists: ' . (isset($product) ? 'YES' : 'NO'));
+			$this->log_error('Product type: ' . (isset($product) ? get_class($product) : 'N/A'));
+
 			if (! $product instanceof WC_Product) {
+				$this->log_error('Single button not rendered - invalid product object');
 				return;
 			}
 
 			$disabled = get_post_meta($product->get_id(), '_onlive_wa_disable', true);
+			$this->log_error('Product disabled for WhatsApp: ' . ($disabled === 'yes' ? 'YES' : 'NO'));
+
 			if ('yes' === $disabled) {
+				$this->log_error('Single button not rendered - disabled for this product');
 				return;
 			}
 
+			$this->log_error('Rendering single button for product ID: ' . $product->get_id());
 			echo wp_kses_post($this->get_button_markup($product, 'product'));
+			$this->log_error('Single button rendered successfully');
 		}
 
 		/**
@@ -279,19 +294,33 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		public function render_cart_button()
 		{
+			$this->log_error('=== RENDER CART BUTTON CHECK ===');
+			$this->log_error('Plugin enabled: ' . ($this->plugin->is_enabled() ? 'YES' : 'NO'));
+			$this->log_error('Should render cart: ' . ($this->plugin->should_render_button('cart') ? 'YES' : 'NO'));
+			$this->log_error('Is cart page: ' . (is_cart() ? 'YES' : 'NO'));
+
 			if (! $this->plugin->is_enabled() || ! $this->plugin->should_render_button('cart')) {
+				$this->log_error('Cart button not rendered - plugin disabled or not configured for cart');
 				return;
 			}
 
 			if (! is_cart()) {
+				$this->log_error('Cart button not rendered - not on cart page');
 				return;
 			}
+
+			$this->log_error('WC function exists: ' . (function_exists('WC') ? 'YES' : 'NO'));
+			$this->log_error('WC cart exists: ' . (function_exists('WC') && WC()->cart ? 'YES' : 'NO'));
+			$this->log_error('Cart is empty: ' . (function_exists('WC') && WC()->cart && WC()->cart->is_empty() ? 'YES' : 'NO'));
 
 			if (! function_exists('WC') || ! WC()->cart || WC()->cart->is_empty()) {
+				$this->log_error('Cart button not rendered - cart not available or empty');
 				return;
 			}
 
+			$this->log_error('Rendering cart button');
 			echo wp_kses_post($this->get_button_markup(null, 'cart'));
+			$this->log_error('Cart button rendered successfully');
 		}
 
 		/**

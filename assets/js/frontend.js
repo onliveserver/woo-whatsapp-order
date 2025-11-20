@@ -1,6 +1,11 @@
 (function ($) {
 	'use strict';
 
+	console.log('=== WHATSAPP PLUGIN JS LOADED ===');
+	console.log('jQuery version:', $.fn.jquery);
+	console.log('Current page URL:', window.location.href);
+	console.log('onliveWAOrder object check:', typeof onliveWAOrder !== 'undefined' ? 'EXISTS' : 'MISSING');
+
 	/**
 	 * Extract variation attributes from form
 	 */
@@ -145,7 +150,22 @@
 
 	// Initialize on document ready
 	$(document).ready(function () {
+		console.log('=== DOCUMENT READY - ATTACHING WHATSAPP HANDLERS ===');
+		console.log('Looking for buttons with class: .onlive-wa-order-button');
+		var buttonCount = $('.onlive-wa-order-button').length;
+		console.log('Found', buttonCount, 'WhatsApp buttons on page');
+
+		if (buttonCount > 0) {
+			console.log('Buttons found:', $('.onlive-wa-order-button'));
+			$('.onlive-wa-order-button').each(function(index) {
+				console.log('Button', index + 1, 'data:', $(this).data());
+			});
+		} else {
+			console.log('WARNING: No WhatsApp buttons found on page!');
+		}
+
 		$(document).on('click', '.onlive-wa-order-button', handleClick);
+		console.log('Click handler attached to .onlive-wa-order-button');
 	});
 
 })(jQuery);
