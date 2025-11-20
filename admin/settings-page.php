@@ -668,23 +668,42 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
 				require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
 
-			// Get latest release from GitHub
+			// Get latest tag from GitHub
 			$response = wp_remote_get(
-				'https://api.github.com/repos/onliveserver/woo-whatsapp-order/releases/latest',
+				'https://api.github.com/repos/onliveserver/woo-whatsapp-order/tags',
 				[ 'timeout' => 10 ]
-			);				if ( is_wp_error( $response ) ) {
-					wp_send_json_error( __( 'Could not reach GitHub. Please try again later.', 'onlive-wa-order' ) );
+			);
+			
+			if ( is_wp_error( $response ) ) {
+				wp_send_json_error( __( 'Could not reach GitHub. Please try again later.', 'onlive-wa-order' ) );
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			$tags = json_decode( $body );
+
+			if ( ! is_array( $tags ) || empty( $tags ) ) {
+				wp_send_json_error( __( 'Could not find tag information. Please try again.', 'onlive-wa-order' ) );
+			}
+
+			// Find the latest tag
+			$latest_tag = null;
+			$latest_version = '0.0.0';
+			foreach ( $tags as $tag ) {
+				if ( isset( $tag->name ) ) {
+					$tag_version = ltrim( $tag->name, 'v' );
+					if ( version_compare( $tag_version, $latest_version, '>' ) ) {
+						$latest_version = $tag_version;
+						$latest_tag = $tag;
+					}
 				}
+			}
 
-				$body = wp_remote_retrieve_body( $response );
-				$release = json_decode( $body );
+			if ( ! $latest_tag || ! isset( $latest_tag->zipball_url ) ) {
+				wp_send_json_error( __( 'Could not find download URL for latest version.', 'onlive-wa-order' ) );
+			}
 
-				if ( ! $release || ! isset( $release->zipball_url ) ) {
-					wp_send_json_error( __( 'Could not find release information. Please try again.', 'onlive-wa-order' ) );
-				}
-
-				// Download and install the plugin
-				$download_url = $release->zipball_url;
+			// Download and install the plugin
+			$download_url = $latest_tag->zipball_url;
 				$file = download_url( $download_url );
 
 				if ( is_wp_error( $file ) ) {
