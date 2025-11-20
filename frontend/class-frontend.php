@@ -472,26 +472,37 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			define( 'DOING_AJAX', true );
 		}
 		
+		// CRITICAL: Stop ALL WordPress output - this must be first
+		@ini_set( 'display_errors', 0 );
+		@ini_set( 'implicit_flush', 0 );
+		
 		// CRITICAL: Prevent all output buffering that might interfere with JSON response
-		while ( @ob_end_clean() ) {
-			// Clear all output buffers
+		$level = ob_get_level();
+		for ( $i = 0; $i < $level; $i++ ) {
+			@ob_end_clean();
 		}
+		
+		// Start a fresh output buffer that we control
+		ob_start();
 		
 		// Prevent WordPress from sending any redirects or extra output
 		nocache_headers();
 		
 		// Ensure WordPress headers are set to JSON - use raw headers
-		header( 'Content-Type: application/json; charset=UTF-8' );
-		header( 'X-Requested-With: XMLHttpRequest' );
-		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+		@header( 'Content-Type: application/json; charset=UTF-8' );
+		@header( 'X-Requested-With: XMLHttpRequest' );
+		@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
 		
 		// Prevent template rendering and redirects - do this early
 		remove_action( 'template_redirect', 'redirect_canonical' );
 		remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
 		
+		// Remove all WordPress shutdown hooks that might interfere
+		remove_all_actions( 'shutdown' );
+		
 		try {
 			// Log request for debugging - ALWAYS log for troubleshooting
-			error_log( 'WhatsApp AJAX Request: action=' . sanitize_key( wp_unslash( $_POST['action'] ?? '' ) ) . ' | context=' . sanitize_key( wp_unslash( $_POST['context'] ?? '' ) ) );
+			error_log( 'WhatsApp AJAX Request START: action=' . sanitize_key( wp_unslash( $_POST['action'] ?? '' ) ) . ' | context=' . sanitize_key( wp_unslash( $_POST['context'] ?? '' ) ) );
 			
 			if ( ! $this->plugin->is_enabled() ) {
 				$this->send_json_response( false, __( 'The WhatsApp button is disabled.', 'onlive-wa-order' ), 400 );
@@ -592,13 +603,28 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 	 * @param int    $status  HTTP status code.
 	 */
 	private function send_json_response( $success, $data, $status = 200 ) {
-		// Clear any output buffers
-		while ( @ob_end_clean() ) {
-			// Keep clearing
+		error_log( 'send_json_response called: success=' . ( $success ? 'true' : 'false' ) . ', status=' . $status );
+		
+		// Clear our controlled output buffer
+		$output = ob_get_clean();
+		if ( ! empty( $output ) ) {
+			error_log( 'WARNING: Unexpected output captured: ' . substr( $output, 0, 200 ) );
+		}
+		
+		// Clear any remaining output buffers
+		$level = ob_get_level();
+		for ( $i = 0; $i < $level; $i++ ) {
+			@ob_end_clean();
 		}
 
 		// Set HTTP status
-		http_response_code( $status );
+		if ( ! headers_sent() ) {
+			http_response_code( $status );
+			header( 'Content-Type: application/json; charset=UTF-8' );
+			header( 'X-Robots-Tag: noindex' );
+		} else {
+			error_log( 'ERROR: Headers already sent!' );
+		}
 
 		// Build response
 		if ( is_string( $data ) ) {
@@ -614,12 +640,21 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 
 		// Output JSON directly
-		echo wp_json_encode( $response );
+		$json = wp_json_encode( $response );
+		error_log( 'Sending JSON (' . strlen( $json ) . ' bytes): ' . $json );
+		
+		echo $json;
+		
+		// Flush output
+		if ( function_exists( 'wp_ob_end_flush_all' ) ) {
+			wp_ob_end_flush_all();
+		}
+		flush();
 
-		error_log( 'JSON Response sent: ' . wp_json_encode( $response ) );
+		error_log( 'JSON Response completed - exiting' );
 
-		// Exit immediately
-		exit;
+		// Die immediately - use wp_die with specific params to prevent any extra output
+		wp_die( '', '', [ 'response' => null, 'exit' => true ] );
 	}
 
 		/**
