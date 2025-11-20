@@ -49,6 +49,21 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			add_action('wp_ajax_nopriv_onlive_wa_ping', [$this, 'handle_ping'], 0);
 			$this->log_error('Ping handlers registered for action: onlive_wa_ping');
 
+			// Add early debug logging callback to track if our hooks are firing
+			add_action('wp_ajax_vaog2jucg3f2', function() {
+				$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/error.log';
+				$timestamp = date('Y-m-d H:i:s');
+				$log_entry = "[$timestamp] === wp_ajax_vaog2jucg3f2 HOOK FIRED ===\n";
+				file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+			}, -1000); // Very early priority
+
+			add_action('wp_ajax_nopriv_vaog2jucg3f2', function() {
+				$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/error.log';
+				$timestamp = date('Y-m-d H:i:s');
+				$log_entry = "[$timestamp] === wp_ajax_nopriv_vaog2jucg3f2 HOOK FIRED ===\n";
+				file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+			}, -1000); // Very early priority
+
 			// Prevent redirects during AJAX requests - hook very early
 			add_action('plugins_loaded', [$this, 'prevent_ajax_redirect'], -999);
 			add_action('init', [$this, 'prevent_ajax_redirect'], 0);

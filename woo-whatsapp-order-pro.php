@@ -560,9 +560,36 @@ function onlive_wa_early_debug() {
 	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
 }
 
+/**
+ * Log all WordPress hooks being fired during AJAX requests.
+ */
+function onlive_wa_log_all_hooks() {
+	// Only log if we detect our AJAX action in request
+	static $is_our_request = null;
+	
+	if ( $is_our_request === null ) {
+		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+		$is_our_request = in_array( $action, [ 'vaog2jucg3f2', 'onlive_wa_ping' ], true );
+	}
+	
+	if ( ! $is_our_request ) {
+		return;
+	}
+
+	$log_file = WP_CONTENT_DIR . '/plugins/onlive-whatsapp-order/hook-trace.log';
+	$hook = current_filter();
+	$timestamp = date('Y-m-d H:i:s');
+	$log_entry = "[{$timestamp}] Hook fired: {$hook}\n";
+	file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+}
+
 add_action( 'plugins_loaded', 'onlive_wa_early_debug', 0 );
 add_action( 'init', 'onlive_wa_early_debug', 0 );
 add_action( 'wp_loaded', 'onlive_wa_early_debug', 0 );
+
+// Log ALL hooks during AJAX - this will show us which hooks are firing
+add_action( 'all', 'onlive_wa_log_all_hooks', 1 );
+
 add_action( 'wp_ajax_nopriv_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
 add_action( 'wp_ajax_vaog2jucg3f2', 'onlive_wa_debug_ajax_requests', -999 );
 add_action( 'wp_ajax_nopriv_onlive_wa_ping', 'onlive_wa_debug_ajax_requests', -999 );
