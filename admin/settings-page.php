@@ -509,11 +509,16 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				$output['button_size'] = in_array( $clean['button_size'], $sizes, true ) ? $clean['button_size'] : $defaults['button_size'];
 			}
 
+			if ( isset( $clean['include_product_link'] ) ) {
+				$output['include_product_link'] = ! empty( $clean['include_product_link'] ) ? 1 : 0;
+			}
+
 			if ( isset( $clean['template_enabled'] ) ) {
 				$output['template_enabled'] = ! empty( $clean['template_enabled'] ) ? 1 : 0;
 			}
 			if ( isset( $clean['message_template'] ) ) {
-				$output['message_template'] = wp_kses_post( $clean['message_template'] );
+				// Use simple sanitization instead of wp_kses_post to avoid timeouts
+				$output['message_template'] = wp_strip_all_tags( (string) $clean['message_template'], true );
 			}
 
 			if ( isset( $clean['api_choice'] ) ) {
