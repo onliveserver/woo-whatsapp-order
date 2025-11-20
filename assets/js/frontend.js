@@ -1,12 +1,11 @@
 (function ($) {
 	'use strict';
 
+	/**
+	 * Extract variation attributes from form
+	 */
 	function getVariations($form) {
 		var attributes = {};
-		if (!$form || !$form.length) {
-			return attributes;
-		}
-
 		$form.find('[name^="attribute_"]').each(function () {
 			var $field = $(this);
 			var name = $field.attr('name').replace('attribute_', '');
@@ -15,10 +14,12 @@
 				attributes[name] = value;
 			}
 		});
-
 		return attributes;
 	}
 
+	/**
+	 * Build AJAX request payload
+	 */
 	function getPayload($button) {
 		var context = $button.data('context') || 'product';
 		var payload = {
@@ -28,79 +29,88 @@
 
 		if (context === 'product') {
 			var $form = $button.closest('form.cart');
-			if (!$form.length && $button.data('product')) {
-				$form = $('form.cart').filter(function () {
-					return $(this).find('input[name="product_id"]').val() === String($button.data('product'));
-				}).first();
-			}
-
-			payload.product_id = $button.data('product') || ($form.find('input[name="product_id"]').val() || 0);
-			payload.variation_id = $form.find('input[name="variation_id"]').val() || 0;
-			payload.quantity = $form.find('input[name="quantity"]').val() || 1;
+			payload.product_id = $button.data('product') || ($form.length ? $form.find('input[name="product_id"]').val() : 0);
+			payload.variation_id = $form.length ? $form.find('input[name="variation_id"]').val() : 0;
+			payload.quantity = $form.length ? $form.find('input[name="quantity"]').val() : 1;
 			payload.variations = JSON.stringify(getVariations($form));
 		}
 
 		return payload;
 	}
 
+	/**
+	 * Handle button click
+	 */
 	function handleClick(event) {
 		if (typeof onliveWAOrder === 'undefined') {
+			alert('Plugin configuration error');
 			return;
 		}
 
 		event.preventDefault();
-
 		var $button = $(this);
-		var payload = getPayload($button);
-		
-		// Add loading state to button
-		$button.addClass('is-loading');
-		$button.prop('disabled', true);
-		var originalText = $button.text();
-		$button.html('<span class="spinner" style="display: inline-block; margin-right: 5px;"></span>Processing...');
 
+		// Show loading state
+		$button.prop('disabled', true);
+		var originalText = $button.html();
+		$button.html('<span style="display:inline-block; margin-right:5px;">⏳</span>Loading...');
+
+		// Build and send request
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
-			data: payload,
+			data: getPayload($button),
 			dataType: 'json',
-			timeout: 15000,
+			timeout: 10000,
+
 			success: function (response) {
-				if (response && response.success && response.data && response.data.url) {
+				// Check response structure
+				if (!response || typeof response !== 'object') {
+					showError('Invalid response from server');
+					return;
+				}
+
+				// Success case
+				if (response.success && response.data && response.data.url) {
 					window.open(response.data.url, '_blank', 'noopener');
 				} else {
-					var msg = response.data && response.data.message ? response.data.message : onliveWAOrder.strings.error;
-					alert(msg);
+					// Error case - use message from response
+					var errorMsg = response.message || (response.data && response.data.message) || 'An error occurred';
+					showError(errorMsg);
 				}
 			},
-			error: function (xhr) {
-				var msg = onliveWAOrder.strings.error;
-				if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
-					msg = xhr.responseJSON.data.message;
+
+			error: function (xhr, status, error) {
+				// Handle different error types
+				if (status === 'timeout') {
+					showError('Request timeout - please try again');
+				} else if (xhr.status === 0) {
+					showError('Network error - please check your connection');
+				} else if (xhr.responseJSON && xhr.responseJSON.message) {
+					showError(xhr.responseJSON.message);
+				} else {
+					showError('Request failed - please try again');
 				}
-				alert(msg);
 			},
+
 			complete: function () {
-				$button.removeClass('is-loading');
+				// Restore button
 				$button.prop('disabled', false);
 				$button.html(originalText);
 			}
 		});
 	}
 
-	// Check admin-ajax.php accessibility on page load
-	$(function () {
-		if (typeof onliveWAOrder === 'undefined' || !onliveWAOrder.ajaxUrl) {
-			return;
-		}
+	/**
+	 * Show error message to user
+	 */
+	function showError(message) {
+		alert('WhatsApp Error: ' + message);
+	}
 
-		$.ajax({
-			type: 'POST',
-			url: onliveWAOrder.ajaxUrl,
-			data: { action: 'onlive_wa_ping' },
-			timeout: 5000
-		});
+	// Initialize on document ready
+	$(document).ready(function () {
+		$(document).on('click', '.onlive-wa-order-button', handleClick);
 	});
 
-	$(document).on('click', '.onlive-wa-order-button', handleClick);
 })(jQuery);

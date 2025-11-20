@@ -455,107 +455,85 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 	 * AJAX handler to build WhatsApp URL.
 	 */
 	public function handle_ajax_message() {
-		// Ensure output buffering is clean
+		// Clear output buffers
 		while ( ob_get_level() > 0 ) {
 			ob_end_clean();
 		}
 
-		// Set JSON headers explicitly FIRST - force override on LiteSpeed
+		// Force JSON response headers
 		header( 'Content-Type: application/json; charset=UTF-8', true );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate, max-age=0', true );
 		header( 'Pragma: no-cache', true );
-		header( 'Expires: Thu, 01 Jan 1970 00:00:00 GMT', true );
-		header( 'X-Content-Type-Options: nosniff', true );
+		header( 'Expires: 0', true );
 
-		try {
-			// Check if plugin is enabled
-			if ( ! $this->plugin->is_enabled() ) {
-				echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Plugin is disabled' ] ] );
-				exit;
-			}
-
-			// Get context
-			$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
-			$data = [];
-
-			// Prepare data based on context
-			if ( 'cart' === $context ) {
-				$data = $this->prepare_cart_data();
-				if ( is_wp_error( $data ) ) {
-					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => $data->get_error_message() ] ] );
-					exit;
-				}
-			} else {
-				// Validate product_id
-				if ( ! isset( $_POST['product_id'] ) || empty( $_POST['product_id'] ) ) {
-					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Product ID is missing' ] ] );
-					exit;
-				}
-
-				$product_id   = absint( wp_unslash( $_POST['product_id'] ) );
-				$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
-				$quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( wp_unslash( $_POST['quantity'] ) ) ) : 1;
-				$raw_variants = isset( $_POST['variations'] ) ? json_decode( wp_unslash( $_POST['variations'] ), true ) : [];
-				$variants     = [];
-				
-				if ( is_array( $raw_variants ) ) {
-					foreach ( $raw_variants as $name => $value ) {
-						$variants[ sanitize_title( $name ) ] = sanitize_text_field( $value );
-					}
-				}
-
-				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
-				if ( is_wp_error( $data ) ) {
-					echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => $data->get_error_message() ] ] );
-					exit;
-				}
-			}
-
-			// Validate data
-			if ( empty( $data ) || ! is_array( $data ) ) {
-				echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'No product data available' ] ] );
-				exit;
-			}
-
-			// Generate message
-			$message = $this->plugin->generate_message( $context, $data );
-			if ( empty( $message ) ) {
-				echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Could not generate message' ] ] );
-				exit;
-			}
-
-			// Get WhatsApp URL
-			$url = $this->plugin->get_whatsapp_url( $message );
-
-			// If URL is empty, try fallback
-			if ( empty( $url ) ) {
-				$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->plugin->get_setting( 'phone', '' ) );
-				if ( empty( $phone ) ) {
-					$encoded = rawurlencode( $message );
-					$url = 'https://wa.me/?text=' . $encoded;
-				}
-			}
-
-			// Final fallback
-			if ( empty( $url ) ) {
-				$encoded = rawurlencode( $message );
-				$url = 'https://wa.me/?text=' . $encoded;
-			}
-
-			// Validate final URL and message
-			if ( empty( $url ) || empty( $message ) ) {
-				echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Invalid URL or message' ] ] );
-				exit;
-			}
-
-			// Send success response
-			echo wp_json_encode( [ 'success' => true, 'data' => [ 'url' => $url, 'message' => $message ] ] );
-			exit;
-			
-		} catch ( Exception $e ) {
-			echo wp_json_encode( [ 'success' => false, 'data' => [ 'message' => 'Error: ' . $e->getMessage() ] ] );
-			exit;
+		// Verify plugin is enabled
+		if ( ! $this->plugin->is_enabled() ) {
+			$this->send_json_response( false, 'Plugin is disabled' );
 		}
+
+		// Get and validate context
+		$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
+
+		// Prepare data
+		if ( 'cart' === $context ) {
+			$data = $this->prepare_cart_data();
+		} else {
+			$product_id = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+			
+			if ( ! $product_id ) {
+				$this->send_json_response( false, 'Product ID is required' );
+			}
+
+			$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
+			$quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( wp_unslash( $_POST['quantity'] ) ) ) : 1;
+			$variations   = isset( $_POST['variations'] ) ? json_decode( wp_unslash( $_POST['variations'] ), true ) : [];
+
+			$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variations );
+		}
+
+		// Check for errors
+		if ( is_wp_error( $data ) ) {
+			$this->send_json_response( false, $data->get_error_message() );
+		}
+
+		if ( empty( $data ) || ! is_array( $data ) ) {
+			$this->send_json_response( false, 'Unable to retrieve product data' );
+		}
+
+		// Generate WhatsApp message
+		$message = $this->plugin->generate_message( $context, $data );
+		if ( empty( $message ) ) {
+			$this->send_json_response( false, 'Unable to generate message' );
+		}
+
+		// Get WhatsApp URL
+		$url = $this->plugin->get_whatsapp_url( $message );
+
+		// Fallback: Create wa.me URL if needed
+		if ( empty( $url ) ) {
+			$url = 'https://wa.me/?text=' . rawurlencode( $message );
+		}
+
+		// Return success
+		$this->send_json_response( true, 'Success', [ 'url' => $url, 'message' => $message ] );
+	}
+
+	/**
+	 * Send JSON response and exit.
+	 *
+	 * @param bool   $success Success status.
+	 * @param string $message Response message.
+	 * @param array  $data    Additional data.
+	 */
+	private function send_json_response( $success, $message, $data = [] ) {
+		$response = [
+			'success' => (bool) $success,
+			'message' => $message,
+			'data'    => $data,
+		];
+
+		echo wp_json_encode( $response );
+		exit;
 	}
 
 
