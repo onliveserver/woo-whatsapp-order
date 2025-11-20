@@ -45,21 +45,17 @@
 
 	function handleClick(event) {
 		if (typeof onliveWAOrder === 'undefined') {
-			console.error('onliveWAOrder object not initialized');
 			return;
 		}
 
 		event.preventDefault();
 
 		var $button = $(this);
-		
 		var payload = getPayload($button);
 		
 		// Add loading state to button
 		$button.addClass('is-loading');
 		$button.prop('disabled', true);
-		
-		// Update button text to show loading
 		var originalText = $button.text();
 		$button.html('<span class="spinner" style="display: inline-block; margin-right: 5px;"></span>Processing...');
 
@@ -70,36 +66,19 @@
 			dataType: 'json',
 			timeout: 15000,
 			success: function (response) {
-				if (response && response.success && response.data) {
-					// If URL and message are present, redirect to WhatsApp
-					if (response.data.url && response.data.message) {
-						window.open(response.data.url, '_blank', 'noopener');
-						return;
-					}
+				if (response && response.success && response.data && response.data.url) {
+					window.open(response.data.url, '_blank', 'noopener');
+				} else {
+					var msg = response.data && response.data.message ? response.data.message : onliveWAOrder.strings.error;
+					alert(msg);
 				}
-				
-				// If no success or missing data, show error
-				var errorMsg = response.data && response.data.message ? response.data.message : onliveWAOrder.strings.error;
-				window.alert(errorMsg);
 			},
 			error: function (xhr) {
-				var message = onliveWAOrder.strings.error;
-				
-				// Try to get error message from response
+				var msg = onliveWAOrder.strings.error;
 				if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
-					message = xhr.responseJSON.data.message;
-				} else if (xhr.responseText) {
-					try {
-						var parsed = JSON.parse(xhr.responseText);
-						if (parsed.data && parsed.data.message) {
-							message = parsed.data.message;
-						}
-					} catch (e) {
-						// Use default message
-					}
+					msg = xhr.responseJSON.data.message;
 				}
-
-				window.alert(message);
+				alert(msg);
 			},
 			complete: function () {
 				$button.removeClass('is-loading');
@@ -115,24 +94,11 @@
 			return;
 		}
 
-		// Verify admin-ajax.php is accessible
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
 			data: { action: 'onlive_wa_ping' },
-			timeout: 5000,
-			success: function () {
-				console.log('WhatsApp Plugin: AJAX endpoint is healthy');
-			},
-			error: function (xhr) {
-				if (xhr.status === 0) {
-					console.warn('WhatsApp Plugin: AJAX connectivity issue - network error or CORS issue');
-				} else if (xhr.status === 404) {
-					console.error('WhatsApp Plugin: AJAX endpoint not found (404). The admin-ajax.php file may not exist or WordPress may not be properly configured.');
-				} else {
-					console.warn('WhatsApp Plugin: AJAX endpoint returned status ' + xhr.status);
-				}
-			}
+			timeout: 5000
 		});
 	});
 

@@ -148,19 +148,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		 * AJAX handler for health check / ping.
 		 */
 		public function handle_ping() {
-			// Clear output buffers
-			while ( @ob_end_clean() ) {
-				// Keep clearing
-			}
-
-			// Prevent WordPress from sending any redirects
-			nocache_headers();
-			header( 'Content-Type: application/json; charset=UTF-8' );
-			header( 'X-Requested-With: XMLHttpRequest' );
-			header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
-			
-			// Send response using safe method
-			$this->send_json_response( true, [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ], 200 );
+			wp_send_json_success( [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ] );
 		}
 
 		/**
@@ -467,48 +455,13 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 	 * AJAX handler to build WhatsApp URL.
 	 */
 	public function handle_ajax_message() {
-		// CRITICAL: Tell WordPress this is AJAX and prevent any template rendering
-		if ( ! defined( 'DOING_AJAX' ) ) {
-			define( 'DOING_AJAX', true );
-		}
-		
-		// CRITICAL: Stop ALL WordPress output - this must be first
-		@ini_set( 'display_errors', 0 );
-		@ini_set( 'implicit_flush', 0 );
-		
-		// CRITICAL: Prevent all output buffering that might interfere with JSON response
-		$level = ob_get_level();
-		for ( $i = 0; $i < $level; $i++ ) {
-			@ob_end_clean();
-		}
-		
-		// Start a fresh output buffer that we control
-		ob_start();
-		
-		// Prevent template rendering and redirects - do this early
-		remove_action( 'template_redirect', 'redirect_canonical' );
-		remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
-		
-		// Remove all WordPress shutdown hooks that might interfere
-		remove_all_actions( 'shutdown' );
-		
-		// Set JSON headers BEFORE anything else
-		@header( 'Content-Type: application/json; charset=UTF-8', true );
-		@header( 'X-Requested-With: XMLHttpRequest', true );
-		@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true );
-		@header( 'Pragma: no-cache', true );
-		@header( 'Expires: 0', true );
-		
-		// Register a custom shutdown function to catch fatal errors
-		register_shutdown_function( [ $this, 'ajax_shutdown_handler' ] );
-		
 		try {
 			// Check if plugin is enabled
 			if ( ! $this->plugin->is_enabled() ) {
-				$this->send_json_response( false, 'Plugin is disabled', 400 );
-				exit;
+				wp_send_json_error( [ 'message' => 'Plugin is disabled' ] );
 			}
 
+			// Get context
 			$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
 			$data = [];
 
@@ -516,14 +469,12 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			if ( 'cart' === $context ) {
 				$data = $this->prepare_cart_data();
 				if ( is_wp_error( $data ) ) {
-					$this->send_json_response( false, 'Cart Error: ' . $data->get_error_message(), 400 );
-					exit;
+					wp_send_json_error( [ 'message' => $data->get_error_message() ] );
 				}
 			} else {
-				// Validate product_id is present
+				// Validate product_id
 				if ( ! isset( $_POST['product_id'] ) || empty( $_POST['product_id'] ) ) {
-					$this->send_json_response( false, 'Product ID is missing', 400 );
-					exit;
+					wp_send_json_error( [ 'message' => 'Product ID is missing' ] );
 				}
 
 				$product_id   = absint( wp_unslash( $_POST['product_id'] ) );
@@ -540,142 +491,58 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
 				if ( is_wp_error( $data ) ) {
-					$this->send_json_response( false, 'Product Error: ' . $data->get_error_message(), 400 );
-					exit;
+					wp_send_json_error( [ 'message' => $data->get_error_message() ] );
 				}
 			}
 
-			// Validate data is not empty
+			// Validate data
 			if ( empty( $data ) || ! is_array( $data ) ) {
-				$this->send_json_response( false, 'No product data available', 400 );
-				exit;
+				wp_send_json_error( [ 'message' => 'No product data available' ] );
 			}
 
 			// Generate message
 			$message = $this->plugin->generate_message( $context, $data );
 			if ( empty( $message ) ) {
-				$this->send_json_response( false, 'Could not generate message', 400 );
-				exit;
+				wp_send_json_error( [ 'message' => 'Could not generate message' ] );
 			}
 
 			// Get WhatsApp URL
 			$url = $this->plugin->get_whatsapp_url( $message );
 
-			// If phone is not configured, use a fallback approach
+			// If URL is empty, try fallback
 			if ( empty( $url ) ) {
 				$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->plugin->get_setting( 'phone', '' ) );
-				
 				if ( empty( $phone ) ) {
 					$encoded = rawurlencode( $message );
 					$url = 'https://wa.me/?text=' . $encoded;
 				}
 			}
 
-			// Final fallback if URL is still empty
+			// Final fallback
 			if ( empty( $url ) ) {
 				$encoded = rawurlencode( $message );
 				$url = 'https://wa.me/?text=' . $encoded;
 			}
 
-			// Validate URL and message before sending
+			// Validate final URL and message
 			if ( empty( $url ) || empty( $message ) ) {
-				$this->send_json_response( false, 'Invalid URL or message', 400 );
-				exit;
+				wp_send_json_error( [ 'message' => 'Invalid URL or message' ] );
 			}
-			
-			// Send response and exit immediately using our custom JSON sender
-			$this->send_json_response( true, [
+
+			// Send success response
+			wp_send_json_success( [
 				'url'     => $url,
 				'message' => $message,
-			], 200 );
-			exit;
+			] );
 			
 		} catch ( Exception $e ) {
-			$this->send_json_response( false, 'Exception: ' . $e->getMessage(), 500 );
-			exit;
+			wp_send_json_error( [ 'message' => 'Error: ' . $e->getMessage() ] );
 		}
 	}
+
 
 	/**
-	 * Send JSON response safely without relying on wp_send_json functions
-	 * which might be affected by output buffering or other issues.
-	 *
-	 * @param bool   $success Success status.
-	 * @param mixed  $data    Response data (message string or array).
-	 * @param int    $status  HTTP status code.
-	 */
-	private function send_json_response( $success, $data, $status = 200 ) {
-		// Clear our controlled output buffer
-		$output = ob_get_clean();
-		
-		// Clear any remaining output buffers
-		$level = ob_get_level();
-		for ( $i = 0; $i < $level; $i++ ) {
-			@ob_end_clean();
-		}
-
-		// Set HTTP status code
-		if ( function_exists( 'http_response_code' ) ) {
-			@http_response_code( $status );
-		} else {
-			$status_header = 'HTTP/1.1 ' . $status;
-			@header( $status_header, true, $status );
-		}
-
-		// Build response
-		if ( is_string( $data ) ) {
-			$response = [
-				'success' => $success,
-				'data'    => [ 'message' => $data ],
-			];
-		} else {
-			$response = [
-				'success' => $success,
-				'data'    => $data,
-			];
-		}
-
-		// Output JSON directly
-		$json = wp_json_encode( $response );
-		
-		// Set content length before output
-		@header( 'Content-Length: ' . strlen( $json ), true );
-		
-		// Output the JSON
-		echo $json;
-		
-		// Flush output buffers
-		@flush();
-		if ( function_exists( 'wp_ob_end_flush_all' ) ) {
-			@wp_ob_end_flush_all();
-		}
-
-		// Exit immediately without any additional output
-		exit;
-	}
-
-	/**
-	 * Custom shutdown handler to catch fatal errors during AJAX.
-	 * This ensures a valid JSON response is sent even if something else crashes.
-	 */
-	public function ajax_shutdown_handler() {
-		$error = error_get_last();
-
-		// Check if a fatal error occurred
-		if ( $error && in_array( $error['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ], true ) ) {
-			// If headers have not been sent, we can send a clean JSON error
-			if ( ! headers_sent() ) {
-				$this->send_json_response(
-					false,
-					__( 'A server error occurred. Please try again.', 'onlive-wa-order' ),
-					500
-				);
-			}
-		}
-	}
-
-		/**
-		 * Prepare product context data.
+	 * Prepare product context data.
 		 *
 		 * @param int   $product_id   Product ID.
 		 * @param int   $variation_id Variation ID.
