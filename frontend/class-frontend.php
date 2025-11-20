@@ -504,22 +504,35 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		register_shutdown_function( [ $this, 'ajax_shutdown_handler' ] );
 		
 		try {
+			// Check if plugin is enabled
 			if ( ! $this->plugin->is_enabled() ) {
-				$this->send_json_response( false, __( 'The WhatsApp button is disabled.', 'onlive-wa-order' ), 400 );
+				$this->send_json_response( false, 'Plugin is disabled', 400 );
+				exit;
 			}
 
 			$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
-
 			$data = [];
 
+			// Prepare data based on context
 			if ( 'cart' === $context ) {
 				$data = $this->prepare_cart_data();
+				if ( is_wp_error( $data ) ) {
+					$this->send_json_response( false, 'Cart Error: ' . $data->get_error_message(), 400 );
+					exit;
+				}
 			} else {
-				$product_id   = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+				// Validate product_id is present
+				if ( ! isset( $_POST['product_id'] ) || empty( $_POST['product_id'] ) ) {
+					$this->send_json_response( false, 'Product ID is missing', 400 );
+					exit;
+				}
+
+				$product_id   = absint( wp_unslash( $_POST['product_id'] ) );
 				$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
 				$quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( wp_unslash( $_POST['quantity'] ) ) ) : 1;
 				$raw_variants = isset( $_POST['variations'] ) ? json_decode( wp_unslash( $_POST['variations'] ), true ) : [];
 				$variants     = [];
+				
 				if ( is_array( $raw_variants ) ) {
 					foreach ( $raw_variants as $name => $value ) {
 						$variants[ sanitize_title( $name ) ] = sanitize_text_field( $value );
@@ -527,13 +540,26 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				}
 
 				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
+				if ( is_wp_error( $data ) ) {
+					$this->send_json_response( false, 'Product Error: ' . $data->get_error_message(), 400 );
+					exit;
+				}
 			}
 
-			if ( is_wp_error( $data ) ) {
-				$this->send_json_response( false, $data->get_error_message(), 400 );
+			// Validate data is not empty
+			if ( empty( $data ) || ! is_array( $data ) ) {
+				$this->send_json_response( false, 'No product data available', 400 );
+				exit;
 			}
 
+			// Generate message
 			$message = $this->plugin->generate_message( $context, $data );
+			if ( empty( $message ) ) {
+				$this->send_json_response( false, 'Could not generate message', 400 );
+				exit;
+			}
+
+			// Get WhatsApp URL
 			$url = $this->plugin->get_whatsapp_url( $message );
 
 			// If phone is not configured, use a fallback approach
@@ -546,15 +572,16 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				}
 			}
 
-			// Only error if still no URL AND plugin is actually disabled
-			if ( empty( $url ) && ! $this->plugin->is_enabled() ) {
-				$this->send_json_response( false, __( 'WhatsApp plugin is not properly activated. Please check the plugin settings.', 'onlive-wa-order' ), 400 );
-			}
-
-			// If still no URL at this point, use generic wa.me
+			// Final fallback if URL is still empty
 			if ( empty( $url ) ) {
 				$encoded = rawurlencode( $message );
 				$url = 'https://wa.me/?text=' . $encoded;
+			}
+
+			// Validate URL and message before sending
+			if ( empty( $url ) || empty( $message ) ) {
+				$this->send_json_response( false, 'Invalid URL or message', 400 );
+				exit;
 			}
 			
 			// Send response and exit immediately using our custom JSON sender
@@ -562,9 +589,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				'url'     => $url,
 				'message' => $message,
 			], 200 );
+			exit;
 			
 		} catch ( Exception $e ) {
-			$this->send_json_response( false, __( 'An error occurred while processing your request. Please try again.', 'onlive-wa-order' ), 500 );
+			$this->send_json_response( false, 'Exception: ' . $e->getMessage(), 500 );
+			exit;
 		}
 	}
 
