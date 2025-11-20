@@ -91,36 +91,48 @@
 			error: function (xhr, status, error) {
 				var message = onliveWAOrder.strings.error;
 				
-				// Log the error for debugging
-				console.error('WhatsApp AJAX Error:', {
-					status: status,
-					statusCode: xhr.status,
-					statusText: xhr.statusText,
-					error: error,
-					response: xhr.responseText,
-					responseJSON: xhr.responseJSON
-				});
+				// Log the error for debugging - DETAILED
+				console.error('=== WhatsApp AJAX Error ===');
+				console.error('Status Code:', xhr.status);
+				console.error('Status Text:', xhr.statusText);
+				console.error('Error:', error);
+				console.error('Response Text:', xhr.responseText);
+				console.error('Response JSON:', xhr.responseJSON);
+				console.error('Request Payload:', payload);
+				console.error('========================');
 
-				// Try to get error message from response
+				// Try to get error message from response - TRY MULTIPLE APPROACHES
 				if (xhr.responseJSON && xhr.responseJSON.data) {
 					if (typeof xhr.responseJSON.data === 'string') {
 						message = xhr.responseJSON.data;
 					} else if (xhr.responseJSON.data.message) {
 						message = xhr.responseJSON.data.message;
 					}
+				} else if (xhr.responseText) {
+					// Try to parse raw response text
+					try {
+						var parsed = JSON.parse(xhr.responseText);
+						if (parsed.data && parsed.data.message) {
+							message = parsed.data.message;
+						}
+					} catch (e) {
+						// Response wasn't JSON, will use status code message
+					}
 				}
 
-				// Handle specific HTTP status codes
+				// Handle specific HTTP status codes - DETAILED MESSAGES
 				if (xhr.status === 0) {
-					message = 'Network error. Please check your connection and try again.';
+					message = 'Network error. Please check your internet connection.';
 				} else if (xhr.status === 302 || xhr.status === 301 || xhr.status === 307) {
-					message = 'Server redirect issue. Please contact support - the WhatsApp plugin may need to be reactivated.';
+					message = 'Server redirect detected. Admin-ajax.php is being redirected. Check your .htaccess or server configuration.';
 				} else if (xhr.status === 404) {
-					message = 'Server error (404). Please contact support. The WhatsApp plugin may not be properly activated.';
+					message = 'Server error (404). The admin-ajax.php file may not exist or the server is returning a 404 page.';
 				} else if (xhr.status === 500) {
-					message = 'Server error (500). Please try again later or contact support.';
+					message = 'Server error (500). Check server error logs for details.';
+				} else if (xhr.status === 403) {
+					message = 'Access forbidden (403). Check file permissions or server security rules.';
 				} else if (status === 'timeout') {
-					message = 'Request timeout. Please try again.';
+					message = 'Request timeout after 15 seconds. The server may be overloaded or unresponsive.';
 				}
 
 				window.alert(message);

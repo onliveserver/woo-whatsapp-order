@@ -480,90 +480,105 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
 		
 		try {
-			// Log request for debugging
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( 'WhatsApp AJAX Request: action=' . sanitize_key( wp_unslash( $_POST['action'] ?? '' ) ) );
+			// Log request for debugging - ALWAYS log for troubleshooting
+			error_log( 'WhatsApp AJAX Request: action=' . sanitize_key( wp_unslash( $_POST['action'] ?? '' ) ) . ' | context=' . sanitize_key( wp_unslash( $_POST['context'] ?? '' ) ) );
+			
+			if ( ! $this->plugin->is_enabled() ) {
+				wp_send_json_error( [ 'message' => __( 'The WhatsApp button is disabled.', 'onlive-wa-order' ) ], 400 );
+				exit;
 			}
+
+			$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
+
+			$data = [];
+
+			if ( 'cart' === $context ) {
+				$data = $this->prepare_cart_data();
+				error_log( 'Cart data prepared: ' . ( is_wp_error( $data ) ? 'ERROR - ' . $data->get_error_message() : 'OK' ) );
+			} else {
+				$product_id   = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+				$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
+				$quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( wp_unslash( $_POST['quantity'] ) ) ) : 1;
+				$raw_variants = isset( $_POST['variations'] ) ? json_decode( wp_unslash( $_POST['variations'] ), true ) : [];
+				$variants     = [];
+				if ( is_array( $raw_variants ) ) {
+					foreach ( $raw_variants as $name => $value ) {
+						$variants[ sanitize_title( $name ) ] = sanitize_text_field( $value );
+					}
+				}
+
+				error_log( 'Preparing product data: product_id=' . $product_id . ', variation_id=' . $variation_id . ', quantity=' . $quantity );
+				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
+				error_log( 'Product data prepared: ' . ( is_wp_error( $data ) ? 'ERROR - ' . $data->get_error_message() : 'OK' ) );
+			}
+
+			if ( is_wp_error( $data ) ) {
+				error_log( 'Data preparation failed: ' . $data->get_error_message() );
+				wp_send_json_error( [ 'message' => $data->get_error_message() ], 400 );
+				exit;
+			}
+
+			error_log( 'Generating message with data: ' . wp_json_encode( $data ) );
+			$message = $this->plugin->generate_message( $context, $data );
+			error_log( 'Message generated: ' . $message );
+			
+			$url = $this->plugin->get_whatsapp_url( $message );
+			error_log( 'WhatsApp URL from get_whatsapp_url: ' . $url );
+
+			// If phone is not configured, use a fallback approach
+			if ( empty( $url ) ) {
+				// Try to build URL with a fallback phone number
+				$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->plugin->get_setting( 'phone', '' ) );
+				error_log( 'Phone from settings: ' . $phone );
 				
-				if ( ! $this->plugin->is_enabled() ) {
-					wp_send_json_error( [ 'message' => __( 'The WhatsApp button is disabled.', 'onlive-wa-order' ) ], 400 );
-				}
-
-				$context = isset( $_POST['context'] ) ? sanitize_key( wp_unslash( $_POST['context'] ) ) : 'product';
-
-				$data = [];
-
-				if ( 'cart' === $context ) {
-					$data = $this->prepare_cart_data();
-				} else {
-					$product_id   = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
-					$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
-					$quantity     = isset( $_POST['quantity'] ) ? max( 1, absint( wp_unslash( $_POST['quantity'] ) ) ) : 1;
-					$raw_variants = isset( $_POST['variations'] ) ? json_decode( wp_unslash( $_POST['variations'] ), true ) : [];
-					$variants     = [];
-					if ( is_array( $raw_variants ) ) {
-						foreach ( $raw_variants as $name => $value ) {
-							$variants[ sanitize_title( $name ) ] = sanitize_text_field( $value );
-						}
-					}
-
-					$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
-				}
-
-				if ( is_wp_error( $data ) ) {
-					wp_send_json_error( [ 'message' => $data->get_error_message() ], 400 );
-				}
-
-				$message = $this->plugin->generate_message( $context, $data );
-				$url     = $this->plugin->get_whatsapp_url( $message );
-
-				// If phone is not configured, use a fallback approach
-				if ( empty( $url ) ) {
-					// Try to build URL with a fallback phone number
-					$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->plugin->get_setting( 'phone', '' ) );
-					
-					if ( empty( $phone ) ) {
-						// Use a sample/demo phone number - this allows the button to work
-						// even without configuration. User can configure later.
-						// This uses a sample number that opens WhatsApp without connecting to a real contact
-						$encoded = rawurlencode( $message );
-						$url = 'https://wa.me/?text=' . $encoded; // Generic WhatsApp link (works without phone)
-					}
-				}
-
-				// Only error if still no URL AND plugin is actually disabled
-				if ( empty( $url ) && ! $this->plugin->is_enabled() ) {
-					wp_send_json_error( [ 'message' => __( 'WhatsApp plugin is not properly activated. Please check the plugin settings.', 'onlive-wa-order' ) ], 400 );
-				}
-
-				// If still no URL at this point, use generic wa.me
-				if ( empty( $url ) ) {
+				if ( empty( $phone ) ) {
+					// Use a sample/demo phone number - this allows the button to work
+					// even without configuration. User can configure later.
+					// This uses a sample number that opens WhatsApp without connecting to a real contact
 					$encoded = rawurlencode( $message );
-					$url = 'https://wa.me/?text=' . $encoded;
+					$url = 'https://wa.me/?text=' . $encoded; // Generic WhatsApp link (works without phone)
+					error_log( 'Using fallback wa.me URL' );
 				}
+			}
 
-				// Send response and exit immediately
-				wp_send_json_success(
-					[
-						'url'     => $url,
-						'message' => $message,
-					]
-				);
-				
-				// This should not be reached, but just in case
-				exit;
-			} catch ( Exception $e ) {
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					error_log( 'WhatsApp AJAX Exception: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString() );
-				}
-				// Send detailed error for debugging
-				$error_message = __( 'An error occurred while building the WhatsApp message. ', 'onlive-wa-order' );
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					$error_message .= '(' . $e->getMessage() . ')';
-				}
-				wp_send_json_error( [ 'message' => $error_message ], 500 );
+			// Only error if still no URL AND plugin is actually disabled
+			if ( empty( $url ) && ! $this->plugin->is_enabled() ) {
+				error_log( 'Plugin not enabled and no URL - returning error' );
+				wp_send_json_error( [ 'message' => __( 'WhatsApp plugin is not properly activated. Please check the plugin settings.', 'onlive-wa-order' ) ], 400 );
 				exit;
 			}
+
+			// If still no URL at this point, use generic wa.me
+			if ( empty( $url ) ) {
+				$encoded = rawurlencode( $message );
+				$url = 'https://wa.me/?text=' . $encoded;
+				error_log( 'Final fallback to wa.me URL' );
+			}
+
+			error_log( 'Final URL: ' . $url );
+			
+			// Send response and exit immediately
+			wp_send_json_success(
+				[
+					'url'     => $url,
+					'message' => $message,
+				]
+			);
+			
+			// This should not be reached, but just in case
+			exit;
+		} catch ( Exception $e ) {
+			// ALWAYS log exception for debugging
+			error_log( 'WhatsApp AJAX Exception: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine() );
+			error_log( 'WhatsApp AJAX Stack Trace: ' . $e->getTraceAsString() );
+			
+			// Send error with actual exception message (temporarily for debugging)
+			$error_message = 'WhatsApp Error: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')';
+			error_log( 'Sending error to client: ' . $error_message );
+			
+			wp_send_json_error( [ 'message' => $error_message ], 500 );
+			exit;
+		}
 		}
 
 		/**
