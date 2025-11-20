@@ -436,3 +436,49 @@ function onlive_wa_order_pro() {
 }
 
 onlive_wa_order_pro();
+
+/**
+ * Prevent WordPress redirects for our AJAX requests at the earliest possible stage.
+ * This prevents 302 redirects that can break AJAX communication.
+ */
+if ( ! function_exists( 'onlive_wa_prevent_ajax_redirects' ) ) {
+	function onlive_wa_prevent_ajax_redirects() {
+		// Check if this is a request to our AJAX endpoint
+		if ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) {
+			return;
+		}
+		
+		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+		if ( ! in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true ) ) {
+			return;
+		}
+		
+		// For our plugin AJAX requests, disable redirects at all levels
+		if ( ! has_filter( 'wp_redirect', 'onlive_wa_block_redirect' ) ) {
+			add_filter( 'wp_redirect', 'onlive_wa_block_redirect', -999, 2 );
+		}
+		
+		// Remove redirect_canonical hook that might cause 302s
+		remove_action( 'template_redirect', 'redirect_canonical' );
+		remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
+	}
+	
+	add_action( 'init', 'onlive_wa_prevent_ajax_redirects', -999 );
+}
+
+/**
+ * Block redirects for our AJAX requests.
+ *
+ * @param string|false $location The location to redirect to.
+ * @param int          $status   The HTTP status code.
+ * @return false|string
+ */
+function onlive_wa_block_redirect( $location, $status ) {
+	$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+	if ( in_array( $action, [ 'onlive_wa_build_message', 'onlive_wa_ping' ], true ) ) {
+		// Return false to prevent the redirect
+		return false;
+	}
+	return $location;
+}
+

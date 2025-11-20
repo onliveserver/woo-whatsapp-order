@@ -39,8 +39,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			add_action( 'wp_ajax_onlive_wa_ping', [ $this, 'handle_ping' ], 0 );
 			add_action( 'wp_ajax_nopriv_onlive_wa_ping', [ $this, 'handle_ping' ], 0 );
 			
-			// Prevent redirects during AJAX requests
-			add_action( 'init', [ $this, 'prevent_ajax_redirect' ], 1 );
+			// Prevent redirects during AJAX requests - hook very early
+			add_action( 'plugins_loaded', [ $this, 'prevent_ajax_redirect' ], -999 );
+			add_action( 'init', [ $this, 'prevent_ajax_redirect' ], 0 );
 			
 			// Also register on admin_init to ensure it's loaded even if wp_enqueue_scripts isn't called
 			add_action( 'admin_init', [ $this, 'register_ajax_handlers' ], 1 );
@@ -55,10 +56,47 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		public function prevent_ajax_redirect() {
 			// Check if this is an AJAX request for our plugin
 			if ( $this->is_our_ajax_request() ) {
-				// Prevent redirects and canonicalization
+				// Prevent all redirects and canonicalization
 				remove_action( 'template_redirect', 'redirect_canonical' );
 				remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
+				
+				// Prevent any post type routing from happening
+				if ( ! has_filter( 'status_header', [ $this, 'filter_status_header' ] ) ) {
+					add_filter( 'status_header', [ $this, 'filter_status_header' ], 10, 2 );
+				}
+				
+				// Also prevent 404 handling
+				if ( ! has_filter( 'pre_handle_404', [ $this, 'handle_404_override' ] ) ) {
+					add_filter( 'pre_handle_404', [ $this, 'handle_404_override' ], 10, 1 );
+				}
 			}
+		}
+		
+		/**
+		 * Override 404 handling for AJAX requests.
+		 *
+		 * @param bool $handled Whether the request was handled.
+		 * @return bool
+		 */
+		public function handle_404_override( $handled ) {
+			if ( $this->is_our_ajax_request() ) {
+				return true; // Mark as handled to prevent 404
+			}
+			return $handled;
+		}
+		
+		/**
+		 * Filter HTTP status header to ensure 200 OK for AJAX.
+		 *
+		 * @param string $status The HTTP status string.
+		 * @param int    $code   The HTTP status code.
+		 * @return string
+		 */
+		public function filter_status_header( $status, $code ) {
+			if ( $this->is_our_ajax_request() && 404 === $code ) {
+				return 'HTTP/1.1 200 OK';
+			}
+			return $status;
 		}
 
 		/**
@@ -404,8 +442,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		 * AJAX handler to build WhatsApp URL.
 		 */
 		public function handle_ajax_message() {
-			// No nonce verification - allow all requests
-			
 			// Prevent WordPress from sending any redirects or extra output
 			nocache_headers();
 			
@@ -413,6 +449,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			@header( 'Content-Type: application/json; charset=' . get_bloginfo( 'charset' ) );
 			@header( 'X-Requested-With: XMLHttpRequest' );
 			@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+			
+			// CRITICAL: Tell WordPress this is AJAX and prevent any template rendering
+			if ( ! defined( 'DOING_AJAX' ) ) {
+				define( 'DOING_AJAX', true );
+			}
 			
 			try {
 				// Log request for debugging
@@ -477,17 +518,22 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 					$url = 'https://wa.me/?text=' . $encoded;
 				}
 
+				// Send response and exit immediately
 				wp_send_json_success(
 					[
 						'url'     => $url,
 						'message' => $message,
 					]
 				);
+				
+				// This should not be reached, but just in case
+				exit;
 			} catch ( Exception $e ) {
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 					error_log( 'WhatsApp AJAX Error: ' . $e->getMessage() );
 				}
 				wp_send_json_error( [ 'message' => __( 'An error occurred. Please try again.', 'onlive-wa-order' ) ], 500 );
+				exit;
 			}
 		}
 
