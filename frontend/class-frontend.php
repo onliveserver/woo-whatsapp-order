@@ -500,10 +500,10 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		// Remove all WordPress shutdown hooks that might interfere
 		remove_all_actions( 'shutdown' );
 		
+		// Register a custom shutdown function to catch fatal errors
+		register_shutdown_function( [ $this, 'ajax_shutdown_handler' ] );
+		
 		try {
-			// Log request for debugging - ALWAYS log for troubleshooting
-			error_log( 'WhatsApp AJAX Request START: action=' . sanitize_key( wp_unslash( $_POST['action'] ?? '' ) ) . ' | context=' . sanitize_key( wp_unslash( $_POST['context'] ?? '' ) ) );
-			
 			if ( ! $this->plugin->is_enabled() ) {
 				$this->send_json_response( false, __( 'The WhatsApp button is disabled.', 'onlive-wa-order' ), 400 );
 			}
@@ -514,7 +514,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 			if ( 'cart' === $context ) {
 				$data = $this->prepare_cart_data();
-				error_log( 'Cart data prepared: ' . ( is_wp_error( $data ) ? 'ERROR - ' . $data->get_error_message() : 'OK' ) );
 			} else {
 				$product_id   = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
 				$variation_id = isset( $_POST['variation_id'] ) ? absint( wp_unslash( $_POST['variation_id'] ) ) : 0;
@@ -527,42 +526,28 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 					}
 				}
 
-				error_log( 'Preparing product data: product_id=' . $product_id . ', variation_id=' . $variation_id . ', quantity=' . $quantity );
 				$data = $this->prepare_product_data( $product_id, $variation_id, $quantity, $variants );
-				error_log( 'Product data prepared: ' . ( is_wp_error( $data ) ? 'ERROR - ' . $data->get_error_message() : 'OK' ) );
 			}
 
 			if ( is_wp_error( $data ) ) {
-				error_log( 'Data preparation failed: ' . $data->get_error_message() );
 				$this->send_json_response( false, $data->get_error_message(), 400 );
 			}
 
-			error_log( 'Generating message with data: ' . wp_json_encode( $data ) );
 			$message = $this->plugin->generate_message( $context, $data );
-			error_log( 'Message generated: ' . $message );
-			
 			$url = $this->plugin->get_whatsapp_url( $message );
-			error_log( 'WhatsApp URL from get_whatsapp_url: ' . $url );
 
 			// If phone is not configured, use a fallback approach
 			if ( empty( $url ) ) {
-				// Try to build URL with a fallback phone number
 				$phone = preg_replace( '/[^0-9\+]/', '', (string) $this->plugin->get_setting( 'phone', '' ) );
-				error_log( 'Phone from settings: ' . $phone );
 				
 				if ( empty( $phone ) ) {
-					// Use a sample/demo phone number - this allows the button to work
-					// even without configuration. User can configure later.
-					// This uses a sample number that opens WhatsApp without connecting to a real contact
 					$encoded = rawurlencode( $message );
-					$url = 'https://wa.me/?text=' . $encoded; // Generic WhatsApp link (works without phone)
-					error_log( 'Using fallback wa.me URL' );
+					$url = 'https://wa.me/?text=' . $encoded;
 				}
 			}
 
 			// Only error if still no URL AND plugin is actually disabled
 			if ( empty( $url ) && ! $this->plugin->is_enabled() ) {
-				error_log( 'Plugin not enabled and no URL - returning error' );
 				$this->send_json_response( false, __( 'WhatsApp plugin is not properly activated. Please check the plugin settings.', 'onlive-wa-order' ), 400 );
 			}
 
@@ -570,10 +555,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			if ( empty( $url ) ) {
 				$encoded = rawurlencode( $message );
 				$url = 'https://wa.me/?text=' . $encoded;
-				error_log( 'Final fallback to wa.me URL' );
 			}
-
-			error_log( 'Final URL: ' . $url );
 			
 			// Send response and exit immediately using our custom JSON sender
 			$this->send_json_response( true, [
@@ -582,15 +564,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			], 200 );
 			
 		} catch ( Exception $e ) {
-			// ALWAYS log exception for debugging
-			error_log( 'WhatsApp AJAX Exception: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine() );
-			error_log( 'WhatsApp AJAX Stack Trace: ' . $e->getTraceAsString() );
-			
-			// Send error with actual exception message
-			$error_message = 'WhatsApp Error: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')';
-			error_log( 'Sending error to client: ' . $error_message );
-			
-			$this->send_json_response( false, $error_message, 500 );
+			$this->send_json_response( false, __( 'An error occurred while processing your request. Please try again.', 'onlive-wa-order' ), 500 );
 		}
 	}
 
@@ -603,13 +577,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 	 * @param int    $status  HTTP status code.
 	 */
 	private function send_json_response( $success, $data, $status = 200 ) {
-		error_log( 'send_json_response called: success=' . ( $success ? 'true' : 'false' ) . ', status=' . $status );
-		
 		// Clear our controlled output buffer
 		$output = ob_get_clean();
-		if ( ! empty( $output ) ) {
-			error_log( 'WARNING: Unexpected output captured: ' . substr( $output, 0, 200 ) );
-		}
 		
 		// Clear any remaining output buffers
 		$level = ob_get_level();
@@ -622,8 +591,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			http_response_code( $status );
 			header( 'Content-Type: application/json; charset=UTF-8' );
 			header( 'X-Robots-Tag: noindex' );
-		} else {
-			error_log( 'ERROR: Headers already sent!' );
 		}
 
 		// Build response
@@ -641,8 +608,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 		// Output JSON directly
 		$json = wp_json_encode( $response );
-		error_log( 'Sending JSON (' . strlen( $json ) . ' bytes): ' . $json );
-		
 		echo $json;
 		
 		// Flush output
@@ -651,10 +616,28 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		}
 		flush();
 
-		error_log( 'JSON Response completed - exiting' );
-
 		// Die immediately - use wp_die with specific params to prevent any extra output
 		wp_die( '', '', [ 'response' => null, 'exit' => true ] );
+	}
+
+	/**
+	 * Custom shutdown handler to catch fatal errors during AJAX.
+	 * This ensures a valid JSON response is sent even if something else crashes.
+	 */
+	public function ajax_shutdown_handler() {
+		$error = error_get_last();
+
+		// Check if a fatal error occurred
+		if ( $error && in_array( $error['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ], true ) ) {
+			// If headers have not been sent, we can send a clean JSON error
+			if ( ! headers_sent() ) {
+				$this->send_json_response(
+					false,
+					__( 'A server error occurred. Please try again.', 'onlive-wa-order' ),
+					500
+				);
+			}
+		}
 	}
 
 		/**

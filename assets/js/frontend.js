@@ -63,76 +63,40 @@
 		var originalText = $button.text();
 		$button.html('<span class="spinner" style="display: inline-block; margin-right: 5px;"></span>Processing...');
 
-		// Log the request for debugging
-		console.log('WhatsApp AJAX Request:', {
-			url: onliveWAOrder.ajaxUrl,
-			action: payload.action,
-			data: payload,
-			method: 'POST'
-		});
-
 		$.ajax({
 			type: 'POST',
 			url: onliveWAOrder.ajaxUrl,
 			data: payload,
 			dataType: 'json',
-			timeout: 15000, // 15 second timeout
-			redirect: 'error', // Don't follow redirects
+			timeout: 15000,
 			success: function (response) {
-				console.log('WhatsApp AJAX Success:', response);
-				if (response && response.success && response.data && response.data.url) {
-					window.open(response.data.url, '_blank', 'noopener');
-					return;
+				if (response && response.success && response.data) {
+					// If URL and message are present, redirect to WhatsApp
+					if (response.data.url && response.data.message) {
+						window.open(response.data.url, '_blank', 'noopener');
+						return;
+					}
 				}
+				
+				// If no success or missing data, show error
 				var errorMsg = response.data && response.data.message ? response.data.message : onliveWAOrder.strings.error;
-				console.warn('WhatsApp AJAX Error (success=false):', errorMsg);
 				window.alert(errorMsg);
 			},
-			error: function (xhr, status, error) {
+			error: function (xhr) {
 				var message = onliveWAOrder.strings.error;
 				
-				// Log the error for debugging - DETAILED
-				console.error('=== WhatsApp AJAX Error ===');
-				console.error('Status Code:', xhr.status);
-				console.error('Status Text:', xhr.statusText);
-				console.error('Error:', error);
-				console.error('Response Text:', xhr.responseText);
-				console.error('Response JSON:', xhr.responseJSON);
-				console.error('Request Payload:', payload);
-				console.error('========================');
-
-				// Try to get error message from response - TRY MULTIPLE APPROACHES
-				if (xhr.responseJSON && xhr.responseJSON.data) {
-					if (typeof xhr.responseJSON.data === 'string') {
-						message = xhr.responseJSON.data;
-					} else if (xhr.responseJSON.data.message) {
-						message = xhr.responseJSON.data.message;
-					}
+				// Try to get error message from response
+				if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+					message = xhr.responseJSON.data.message;
 				} else if (xhr.responseText) {
-					// Try to parse raw response text
 					try {
 						var parsed = JSON.parse(xhr.responseText);
 						if (parsed.data && parsed.data.message) {
 							message = parsed.data.message;
 						}
 					} catch (e) {
-						// Response wasn't JSON, will use status code message
+						// Use default message
 					}
-				}
-
-				// Handle specific HTTP status codes - DETAILED MESSAGES
-				if (xhr.status === 0) {
-					message = 'Network error. Please check your internet connection.';
-				} else if (xhr.status === 302 || xhr.status === 301 || xhr.status === 307) {
-					message = 'Server redirect detected. Admin-ajax.php is being redirected. Check your .htaccess or server configuration.';
-				} else if (xhr.status === 404) {
-					message = 'Server error (404). The admin-ajax.php file may not exist or the server is returning a 404 page.';
-				} else if (xhr.status === 500) {
-					message = 'Server error (500). Check server error logs for details.';
-				} else if (xhr.status === 403) {
-					message = 'Access forbidden (403). Check file permissions or server security rules.';
-				} else if (status === 'timeout') {
-					message = 'Request timeout after 15 seconds. The server may be overloaded or unresponsive.';
 				}
 
 				window.alert(message);
