@@ -563,6 +563,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				wp_clean_plugins_cache();
 				delete_transient( 'onlive_wa_github_version' );
 				delete_transient( 'onlive_wa_github_release' );
+				delete_transient( 'onlive_wa_latest_github_version' );
 
 				// Force WordPress update check
 				if ( function_exists( 'wp_update_plugins' ) ) {
@@ -844,6 +845,16 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$has_update      = ! is_wp_error( $latest_version ) && version_compare( $latest_version, $current_version, '>' );
 			$last_check      = get_option( 'onlive_wa_last_update_check' );
 			$check_text      = $last_check ? sprintf( __( 'Last checked: %s ago', 'onlive-wa-order' ), human_time_diff( $last_check ) ) : __( 'Never checked', 'onlive-wa-order' );
+
+			// Handle force refresh
+			if ( isset( $_POST['force_refresh_updates'] ) && check_admin_referer( 'force_refresh_updates' ) ) {
+				delete_transient( 'onlive_wa_latest_github_version' );
+				$latest_version = $this->get_latest_github_version();
+				$has_update     = ! is_wp_error( $latest_version ) && version_compare( $latest_version, $current_version, '>' );
+				$last_check     = time();
+				update_option( 'onlive_wa_last_update_check', $last_check );
+				$check_text     = __( 'Last checked: just now', 'onlive-wa-order' );
+			}
 
 			?>
 			<div style="background: #fff; padding: 20px; border-radius: 5px; border: 1px solid #ddd; margin-top: 20px;">
