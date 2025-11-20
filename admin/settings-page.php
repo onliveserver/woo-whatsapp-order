@@ -668,13 +668,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
 				require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
 
-				// Get latest release from GitHub
-				$response = wp_remote_get(
-					'https://api.github.com/repos/onlive-technologies/onlive-whatsapp-order-pro/releases/latest',
-					[ 'timeout' => 10 ]
-				);
-
-				if ( is_wp_error( $response ) ) {
+			// Get latest release from GitHub
+			$response = wp_remote_get(
+				'https://api.github.com/repos/onliveserver/woo-whatsapp-order/releases/latest',
+				[ 'timeout' => 10 ]
+			);				if ( is_wp_error( $response ) ) {
 					wp_send_json_error( __( 'Could not reach GitHub. Please try again later.', 'onlive-wa-order' ) );
 				}
 
@@ -840,8 +838,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 					<tr>
 						<th scope="row"><?php esc_html_e( 'GitHub Repository', 'onlive-wa-order' ); ?></th>
 						<td>
-							<a href="https://github.com/onlive-technologies/onlive-whatsapp-order-pro" target="_blank" style="color: #0073aa; text-decoration: none;">
-								https://github.com/onlive-technologies/onlive-whatsapp-order-pro
+							<a href="https://github.com/onliveserver/woo-whatsapp-order" target="_blank" style="color: #0073aa; text-decoration: none;">
+								https://github.com/onliveserver/woo-whatsapp-order
 								<span class="dashicons dashicons-external" style="width: 16px; height: 16px; margin-left: 5px;"></span>
 							</a>
 						</td>
@@ -979,19 +977,17 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		 * @return string|WP_Error
 		 */
 		public function get_latest_github_version() {
-			$cache_key = 'onlive_wa_latest_github_version';
-			$cached    = get_transient( $cache_key );
+		$cache_key = 'onlive_wa_latest_github_version';
+		$cached    = get_transient( $cache_key );
 
-			if ( false !== $cached ) {
-				return $cached;
-			}
+		if ( false !== $cached ) {
+			return $cached;
+		}
 
-			$response = wp_remote_get(
-				'https://api.github.com/repos/onlive-technologies/onlive-whatsapp-order-pro/releases/latest',
-				[ 'timeout' => 10 ]
-			);
-
-			if ( is_wp_error( $response ) ) {
+		$response = wp_remote_get(
+			'https://api.github.com/repos/onliveserver/woo-whatsapp-order/releases/latest',
+			[ 'timeout' => 10 ]
+		);			if ( is_wp_error( $response ) ) {
 				return $response;
 			}
 
