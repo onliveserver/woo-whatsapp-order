@@ -485,20 +485,19 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		// Start a fresh output buffer that we control
 		ob_start();
 		
-		// Prevent WordPress from sending any redirects or extra output
-		nocache_headers();
-		
-		// Ensure WordPress headers are set to JSON - use raw headers
-		@header( 'Content-Type: application/json; charset=UTF-8' );
-		@header( 'X-Requested-With: XMLHttpRequest' );
-		@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
-		
 		// Prevent template rendering and redirects - do this early
 		remove_action( 'template_redirect', 'redirect_canonical' );
 		remove_action( 'template_redirect', 'wp_redirect_admin_locations' );
 		
 		// Remove all WordPress shutdown hooks that might interfere
 		remove_all_actions( 'shutdown' );
+		
+		// Set JSON headers BEFORE anything else
+		@header( 'Content-Type: application/json; charset=UTF-8', true );
+		@header( 'X-Requested-With: XMLHttpRequest', true );
+		@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true );
+		@header( 'Pragma: no-cache', true );
+		@header( 'Expires: 0', true );
 		
 		// Register a custom shutdown function to catch fatal errors
 		register_shutdown_function( [ $this, 'ajax_shutdown_handler' ] );
@@ -615,11 +614,12 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			@ob_end_clean();
 		}
 
-		// Set HTTP status
-		if ( ! headers_sent() ) {
-			http_response_code( $status );
-			header( 'Content-Type: application/json; charset=UTF-8' );
-			header( 'X-Robots-Tag: noindex' );
+		// Set HTTP status code
+		if ( function_exists( 'http_response_code' ) ) {
+			@http_response_code( $status );
+		} else {
+			$status_header = 'HTTP/1.1 ' . $status;
+			@header( $status_header, true, $status );
 		}
 
 		// Build response
@@ -637,13 +637,18 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 
 		// Output JSON directly
 		$json = wp_json_encode( $response );
+		
+		// Set content length before output
+		@header( 'Content-Length: ' . strlen( $json ), true );
+		
+		// Output the JSON
 		echo $json;
 		
-		// Flush output
+		// Flush output buffers
+		@flush();
 		if ( function_exists( 'wp_ob_end_flush_all' ) ) {
-			wp_ob_end_flush_all();
+			@wp_ob_end_flush_all();
 		}
-		flush();
 
 		// Exit immediately without any additional output
 		exit;
