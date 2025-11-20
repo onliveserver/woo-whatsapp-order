@@ -554,9 +554,14 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				exit;
 			} catch ( Exception $e ) {
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					error_log( 'WhatsApp AJAX Error: ' . $e->getMessage() );
+					error_log( 'WhatsApp AJAX Exception: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString() );
 				}
-				wp_send_json_error( [ 'message' => __( 'An error occurred. Please try again.', 'onlive-wa-order' ) ], 500 );
+				// Send detailed error for debugging
+				$error_message = __( 'An error occurred while building the WhatsApp message. ', 'onlive-wa-order' );
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					$error_message .= '(' . $e->getMessage() . ')';
+				}
+				wp_send_json_error( [ 'message' => $error_message ], 500 );
 				exit;
 			}
 		}
@@ -571,15 +576,25 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		 *
 		 * @return array|WP_Error
 		 */
-		protected function prepare_product_data( $product_id, $variation_id, $quantity, $attributes ) {
+	protected function prepare_product_data( $product_id, $variation_id, $quantity, $attributes ) {
+		try {
+			// Get product - use variation if provided
 			$product = wc_get_product( $variation_id ?: $product_id );
 			if ( ! $product ) {
 				return new WP_Error( 'missing_product', __( 'Product not found.', 'onlive-wa-order' ) );
 			}
 
+			// Get base product for link
 			$base_product = $variation_id ? wc_get_product( $product_id ) : $product;
-			$price_raw    = wc_get_price_to_display( $product );
-			$price_label  = strip_tags( html_entity_decode( wc_price( $price_raw ) ) );
+			
+			// Get price with fallback for guest users
+			try {
+				$price_raw = wc_get_price_to_display( $product );
+			} catch ( Exception $e ) {
+				$price_raw = $product->get_price();
+			}
+			
+			$price_label = strip_tags( html_entity_decode( wc_price( $price_raw ) ) );
 
 			$variation_text = '';
 			if ( ! empty( $attributes ) ) {
@@ -603,7 +618,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				'product_sku'       => $product->get_sku(),
 				'cart_total'        => '',
 			];
+		} catch ( Exception $e ) {
+			// If an exception occurs, return a basic product data with fallbacks
+			return new WP_Error( 'product_error', __( 'Error retrieving product information.', 'onlive-wa-order' ) );
 		}
+	}
 
 		/**
 		 * Prepare cart context data.
