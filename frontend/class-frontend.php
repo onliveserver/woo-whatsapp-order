@@ -539,18 +539,39 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				// Get base product for link
 				$base_product = $variation_id ? wc_get_product($product_id) : $product;
 
-				// Get price with fallback for guest users
+				// Get price with multiple fallbacks
+				$price_label = '';
+				$currency_symbol = get_woocommerce_currency_symbol();
+				
 				try {
+					// Try wc_get_price_to_display first (respects customer prices)
 					$price_raw = wc_get_price_to_display($product);
-					$currency_symbol = get_woocommerce_currency_symbol();
-					$price_label = $currency_symbol . number_format($price_raw, 2);
-				} catch (Exception $e) {
-					$price_raw = $product->get_price();
 					if ($price_raw) {
-						$currency_symbol = get_woocommerce_currency_symbol();
 						$price_label = $currency_symbol . number_format($price_raw, 2);
-					} else {
-						$price_label = '';
+					}
+				} catch (Exception $e) {
+					// Fallback 1: get_price()
+					if (!$price_raw || !$price_label) {
+						$price_raw = $product->get_price();
+						if ($price_raw) {
+							$price_label = $currency_symbol . number_format($price_raw, 2);
+						}
+					}
+				}
+				
+				// Fallback 2: get_regular_price() if still empty
+				if (!$price_label) {
+					$price_regular = $product->get_regular_price();
+					if ($price_regular) {
+						$price_label = $currency_symbol . number_format($price_regular, 2);
+					}
+				}
+				
+				// Fallback 3: get_sale_price() if still empty
+				if (!$price_label) {
+					$price_sale = $product->get_sale_price();
+					if ($price_sale) {
+						$price_label = $currency_symbol . number_format($price_sale, 2);
 					}
 				}
 
