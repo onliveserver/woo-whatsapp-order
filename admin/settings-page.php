@@ -42,6 +42,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_action( 'wp_ajax_onlive_wa_check_updates', [ $this, 'ajax_check_updates' ] );
 			add_action( 'wp_ajax_onlive_wa_force_reinstall', [ $this, 'ajax_force_reinstall' ] );
 			add_action( 'wp_ajax_onlive_wa_auto_install_update', [ $this, 'ajax_auto_install_update' ] );
+			add_filter( 'plugin_action_links_' . plugin_basename( ONLIVE_WA_ORDER_FILE ), [ $this, 'add_plugin_action_links' ] );
 		}
 
 		/**
@@ -57,6 +58,22 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				'dashicons-whatsapp',
 				56
 			);
+		}
+
+		/**
+		 * Add Settings link to plugin action links.
+		 *
+		 * @param array $links Action links.
+		 * @return array Modified action links.
+		 */
+		public function add_plugin_action_links( $links ) {
+			$settings_link = sprintf(
+				'<a href="%s">%s</a>',
+				esc_url( admin_url( 'admin.php?page=onlive-wa-order' ) ),
+				esc_html__( 'Settings', 'onlive-wa-order' )
+			);
+			array_unshift( $links, $settings_link );
+			return $links;
 		}
 
 		/**
@@ -567,6 +584,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 					wp_send_json_error( $remote_version->get_error_message() );
 				}
 
+				// Save last check timestamp
+				update_option( 'onlive_wa_last_update_check', time() );
+
 				// Get current version
 				$current_version = $this->plugin->version;
 
@@ -611,6 +631,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				// Reinitialize default settings
 				$default_settings = $this->get_default_settings();
 				update_option( $this->option_name, $default_settings );
+
+				// Save last check timestamp
+				update_option( 'onlive_wa_last_update_check', time() );
 
 				// Refresh plugin settings
 				if ( method_exists( $this->plugin, 'refresh_settings' ) ) {
@@ -678,23 +701,25 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 					wp_send_json_error( sprintf( __( 'Could not extract plugin: %s', 'onlive-wa-order' ), $result->get_error_message() ) );
 				}
 
-				// Clean up old directory if needed
-				delete_transient( 'onlive_wa_github_version' );
-				delete_transient( 'onlive_wa_github_release' );
-				wp_clean_plugins_cache();
 
-				// Refresh plugin settings
-				if ( method_exists( $this->plugin, 'refresh_settings' ) ) {
-					$this->plugin->refresh_settings();
-				}
+			// Clean up old directory if needed
+			delete_transient( 'onlive_wa_github_version' );
+			delete_transient( 'onlive_wa_github_release' );
+			wp_clean_plugins_cache();
 
-				wp_send_json_success( __( '✓ Plugin updated successfully. Your settings have been preserved.', 'onlive-wa-order' ) );
-			} catch ( Exception $e ) {
-				wp_send_json_error( sprintf( __( 'Error installing update: %s', 'onlive-wa-order' ), $e->getMessage() ) );
+			// Save last check timestamp
+			update_option( 'onlive_wa_last_update_check', time() );
+
+			// Refresh plugin settings
+			if ( method_exists( $this->plugin, 'refresh_settings' ) ) {
+				$this->plugin->refresh_settings();
 			}
-		}
 
-		/**
+			wp_send_json_success( __( '✓ Plugin updated successfully. Your settings have been preserved.', 'onlive-wa-order' ) );
+		} catch ( Exception $e ) {
+			wp_send_json_error( sprintf( __( 'Error installing update: %s', 'onlive-wa-order' ), $e->getMessage() ) );
+		}
+	}		/**
 		 * Get default plugin settings.
 		 *
 		 * @return array
@@ -786,6 +811,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$current_version = $this->plugin->version;
 			$latest_version  = $this->get_latest_github_version();
 			$has_update      = ! is_wp_error( $latest_version ) && version_compare( $latest_version, $current_version, '>' );
+			$last_check      = get_option( 'onlive_wa_last_update_check' );
+			$check_text      = $last_check ? sprintf( __( 'Last checked: %s ago', 'onlive-wa-order' ), human_time_diff( $last_check ) ) : __( 'Never checked', 'onlive-wa-order' );
 
 			?>
 			<div style="background: #fff; padding: 20px; border-radius: 5px; border: 1px solid #ddd; margin-top: 20px;">
@@ -807,7 +834,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 								<?php else : ?>
 									<span style="background: #4CAF50; color: white; padding: 3px 8px; border-radius: 3px; margin-left: 10px;"><?php esc_html_e( 'Up to Date', 'onlive-wa-order' ); ?></span>
 								<?php endif; ?>
-							<?php endif; ?>
+```							<?php endif; ?>
 						</td>
 					</tr>
 					<tr>
@@ -818,6 +845,10 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 								<span class="dashicons dashicons-external" style="width: 16px; height: 16px; margin-left: 5px;"></span>
 							</a>
 						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Last Check', 'onlive-wa-order' ); ?></th>
+						<td><em><?php echo esc_html( $check_text ); ?></em></td>
 					</tr>
 				</table>
 			</div>
