@@ -377,6 +377,10 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			if ('cart' === $context) {
 				$data = $this->prepare_cart_data();
 				$debug_info['data_type'] = 'cart';
+				// Add cart debug info to main debug
+				if (is_wp_error($data)) {
+					$debug_info['cart_debug'] = $data->get_error_data();
+				}
 			} else {
 				$product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
 
@@ -521,8 +525,26 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		protected function prepare_cart_data()
 		{
+			$debug_info['cart_check'] = [
+				'wc_exists' => function_exists('WC'),
+				'wc_cart_exists' => function_exists('WC') && isset(WC()->cart),
+				'cart_count' => function_exists('WC') && WC()->cart ? WC()->cart->get_cart_contents_count() : 0,
+				'is_user_logged_in' => is_user_logged_in(),
+				'session_id' => session_id(),
+			];
+
 			if (! function_exists('WC') || ! WC()->cart) {
-				return new WP_Error('missing_cart', __('Cart is empty.', 'onlive-wa-order'));
+				$debug_info['cart_error'] = 'WC or cart not available';
+				// For debugging, let's try to initialize WooCommerce session
+				if (function_exists('WC')) {
+					WC()->initialize_session();
+					WC()->initialize_cart();
+					$debug_info['cart_reinit'] = [
+						'cart_exists_after_init' => isset(WC()->cart),
+						'cart_count_after_init' => WC()->cart ? WC()->cart->get_cart_contents_count() : 0,
+					];
+				}
+				return new WP_Error('missing_cart', __('Cart is empty.', 'onlive-wa-order'), $debug_info);
 			}
 
 			$cart        = WC()->cart;
