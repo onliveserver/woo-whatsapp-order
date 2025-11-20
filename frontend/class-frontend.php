@@ -354,12 +354,39 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			// Force JSON response headers
 			header('Content-Type: application/json; charset=UTF-8', true);
 
+			// Ensure WooCommerce is properly loaded for AJAX requests
+			if (!defined('WC_ABSPATH')) {
+				define('WC_ABSPATH', dirname(WP_PLUGIN_DIR . '/woocommerce/woocommerce.php') . '/');
+			}
+
+			// Initialize WooCommerce if not already done
+			if (!function_exists('WC') && !did_action('woocommerce_init')) {
+				// Load WooCommerce core
+				require_once WP_PLUGIN_DIR . '/woocommerce/woocommerce.php';
+				// Initialize WooCommerce
+				WC();
+			}
+
+			// Ensure session is started for non-logged-in users
+			if (!is_user_logged_in() && function_exists('WC')) {
+				if (!WC()->session) {
+					WC()->initialize_session();
+				}
+				if (!WC()->cart) {
+					WC()->initialize_cart();
+				}
+			}
+
 			$debug_info = [
 				'timestamp' => time(),
 				'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
 				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
 				'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
 				'action' => $_REQUEST['action'] ?? 'none',
+				'is_user_logged_in' => is_user_logged_in(),
+				'wc_initialized' => function_exists('WC'),
+				'wc_session_exists' => function_exists('WC') && WC()->session,
+				'wc_cart_exists' => function_exists('WC') && WC()->cart,
 			];
 
 			try {
@@ -377,10 +404,6 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			if ('cart' === $context) {
 				$data = $this->prepare_cart_data();
 				$debug_info['data_type'] = 'cart';
-				// Add cart debug info to main debug
-				if (is_wp_error($data)) {
-					$debug_info['cart_debug'] = $data->get_error_data();
-				}
 			} else {
 				$product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
 
@@ -525,30 +548,19 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		protected function prepare_cart_data()
 		{
-			$debug_info['cart_check'] = [
-				'wc_exists' => function_exists('WC'),
-				'wc_cart_exists' => function_exists('WC') && isset(WC()->cart),
-				'cart_count' => function_exists('WC') && WC()->cart ? WC()->cart->get_cart_contents_count() : 0,
-				'is_user_logged_in' => is_user_logged_in(),
-				'session_id' => session_id(),
-			];
-
 			if (! function_exists('WC') || ! WC()->cart) {
-				$debug_info['cart_error'] = 'WC or cart not available';
-				// For debugging, let's try to initialize WooCommerce session
-				if (function_exists('WC')) {
-					WC()->initialize_session();
-					WC()->initialize_cart();
-					$debug_info['cart_reinit'] = [
-						'cart_exists_after_init' => isset(WC()->cart),
-						'cart_count_after_init' => WC()->cart ? WC()->cart->get_cart_contents_count() : 0,
-					];
-				}
-				return new WP_Error('missing_cart', __('Cart is empty.', 'onlive-wa-order'), $debug_info);
+				return new WP_Error('missing_cart', __('Cart is empty or not available.', 'onlive-wa-order'));
 			}
 
-			$cart        = WC()->cart;
-			$items_text  = $this->format_cart_items($cart->get_cart());
+			$cart = WC()->cart;
+			$cart_contents = $cart->get_cart();
+
+			// Check if cart has items
+			if (empty($cart_contents)) {
+				return new WP_Error('empty_cart', __('Your cart is empty.', 'onlive-wa-order'));
+			}
+
+			$items_text  = $this->format_cart_items($cart_contents);
 			$total_raw   = strip_tags(html_entity_decode($cart->get_total()));
 			$total_items = $cart->get_cart_contents_count();
 
