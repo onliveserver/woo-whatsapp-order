@@ -134,8 +134,10 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 			nocache_headers();
 			@header( 'Content-Type: application/json; charset=' . get_bloginfo( 'charset' ) );
 			@header( 'X-Requested-With: XMLHttpRequest' );
+			@header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
 			
 			wp_send_json_success( [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ] );
+			exit;
 		}
 
 		/**
