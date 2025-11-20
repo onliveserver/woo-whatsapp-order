@@ -44,6 +44,11 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			add_action('wp_ajax_nopriv_vaog2jucg3f2', [$this, 'handle_ajax_message'], 0);
 			$this->log_error('AJAX handlers registered for action: vaog2jucg3f2');
 
+			// Add a simple ping endpoint for testing
+			add_action('wp_ajax_onlive_wa_ping', [$this, 'handle_ping'], 0);
+			add_action('wp_ajax_nopriv_onlive_wa_ping', [$this, 'handle_ping'], 0);
+			$this->log_error('Ping handlers registered for action: onlive_wa_ping');
+
 			// Prevent redirects during AJAX requests - hook very early
 			add_action('plugins_loaded', [$this, 'prevent_ajax_redirect'], -999);
 			add_action('init', [$this, 'prevent_ajax_redirect'], 0);
@@ -163,13 +168,26 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		public function register_ajax_handlers()
 		{
+			$this->log_error('=== REGISTERING AJAX HANDLERS ===');
+			$this->log_error('Checking if wp_ajax_vaog2jucg3f2 exists: ' . (has_action('wp_ajax_vaog2jucg3f2') ? 'YES' : 'NO'));
+			$this->log_error('Checking if wp_ajax_nopriv_vaog2jucg3f2 exists: ' . (has_action('wp_ajax_nopriv_vaog2jucg3f2') ? 'YES' : 'NO'));
+
 			// Ensure handlers are registered
 			if (! has_action('wp_ajax_vaog2jucg3f2')) {
 				add_action('wp_ajax_vaog2jucg3f2', [$this, 'handle_ajax_message']);
+				$this->log_error('Registered wp_ajax_vaog2jucg3f2 handler');
+			} else {
+				$this->log_error('wp_ajax_vaog2jucg3f2 handler already exists');
 			}
+
 			if (! has_action('wp_ajax_nopriv_vaog2jucg3f2')) {
 				add_action('wp_ajax_nopriv_vaog2jucg3f2', [$this, 'handle_ajax_message']);
+				$this->log_error('Registered wp_ajax_nopriv_vaog2jucg3f2 handler');
+			} else {
+				$this->log_error('wp_ajax_nopriv_vaog2jucg3f2 handler already exists');
 			}
+
+			$this->log_error('=== AJAX HANDLERS REGISTRATION COMPLETE ===');
 		}
 		/**
 		 * Enqueue frontend assets.
@@ -419,6 +437,18 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			$this->log_error('DOING_AJAX value: ' . (defined('DOING_AJAX') ? DOING_AJAX : 'N/A'));
 			$this->log_error('POST data: ' . json_encode($_POST));
 			$this->log_error('GET data: ' . json_encode($_GET));
+			$this->log_error('REQUEST data: ' . json_encode($_REQUEST));
+			$this->log_error('SERVER SCRIPT_NAME: ' . ($_SERVER['SCRIPT_NAME'] ?? 'none'));
+			$this->log_error('SERVER REQUEST_URI: ' . ($_SERVER['REQUEST_URI'] ?? 'none'));
+
+			// Check if this is actually our request
+			$action = $_REQUEST['action'] ?? '';
+			if ($action !== 'vaog2jucg3f2') {
+				$this->log_error('ERROR: Wrong action received: ' . $action . ' (expected: vaog2jucg3f2)');
+				return; // Don't process wrong actions
+			}
+
+			$this->log_error('Action is correct, processing request...');
 
 			// Clear output buffers
 			while (ob_get_level() > 0) {
@@ -572,6 +602,24 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 
 			echo wp_json_encode($response);
 			exit;
+		}
+
+		/**
+		 * Simple ping handler for testing AJAX connectivity.
+		 */
+		public function handle_ping()
+		{
+			$this->log_error('=== PING REQUEST RECEIVED ===');
+			$this->log_error('Timestamp: ' . date('Y-m-d H:i:s'));
+			$this->log_error('User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
+			$this->log_error('User ID: ' . (is_user_logged_in() ? get_current_user_id() : 'N/A'));
+
+			$this->send_json_response(true, 'Ping successful', [
+				'timestamp' => time(),
+				'user_logged_in' => is_user_logged_in(),
+				'plugin_enabled' => $this->plugin->is_enabled(),
+				'woocommerce_active' => $this->plugin->is_woocommerce_active(),
+			]);
 		}
 
 
