@@ -354,60 +354,65 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			// Force JSON response headers
 			header('Content-Type: application/json; charset=UTF-8', true);
 
-			// Debug: Log that we reached the handler
-			error_log('Onlive WA: AJAX handler called');
+			$debug_info = [
+				'timestamp' => time(),
+				'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
+				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+				'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
+				'action' => $_REQUEST['action'] ?? 'none',
+			];
 
-			// Check if plugin is enabled
-			if (! $this->plugin->is_enabled()) {
-				error_log('Onlive WA: Plugin is disabled');
-				$this->send_json_response(false, 'Plugin is disabled');
-			}
+			try {
+				// Check if plugin is enabled
+				if (! $this->plugin->is_enabled()) {
+					$debug_info['error'] = 'Plugin disabled';
+					$this->send_json_response(false, 'Plugin is disabled', ['debug' => $debug_info]);
+				}
 
-			// Get context
-			$context = isset($_POST['context']) ? sanitize_key(wp_unslash($_POST['context'])) : 'product';
-			error_log('Onlive WA: Context = ' . $context);
+				// Get context
+				$context = isset($_POST['context']) ? sanitize_key(wp_unslash($_POST['context'])) : 'product';
+				$debug_info['context'] = $context;
 
 			// Prepare data
 			if ('cart' === $context) {
 				$data = $this->prepare_cart_data();
-				error_log('Onlive WA: Prepared cart data');
+				$debug_info['data_type'] = 'cart';
 			} else {
 				$product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
 
 				if (! $product_id) {
-					error_log('Onlive WA: Product ID is required');
-					$this->send_json_response(false, 'Product ID is required');
+					$debug_info['error'] = 'Product ID required';
+					$this->send_json_response(false, 'Product ID is required', ['debug' => $debug_info]);
 				}
 
 				$variation_id = isset($_POST['variation_id']) ? absint(wp_unslash($_POST['variation_id'])) : 0;
 				$quantity     = isset($_POST['quantity']) ? max(1, absint(wp_unslash($_POST['quantity']))) : 1;
 				$variations   = isset($_POST['variations']) ? json_decode(wp_unslash($_POST['variations']), true) : [];
 
-				error_log('Onlive WA: Preparing product data - ID: ' . $product_id . ', Variation: ' . $variation_id . ', Qty: ' . $quantity);
+				$debug_info['product_id'] = $product_id;
+				$debug_info['variation_id'] = $variation_id;
+				$debug_info['quantity'] = $quantity;
+
 				$data = $this->prepare_product_data($product_id, $variation_id, $quantity, $variations);
 			}
 
 			// Check for errors
 			if (is_wp_error($data)) {
-				error_log('Onlive WA: Data preparation error: ' . $data->get_error_message());
-				$this->send_json_response(false, $data->get_error_message());
+				$debug_info['error'] = 'Data preparation error: ' . $data->get_error_message();
+				$this->send_json_response(false, $data->get_error_message(), ['debug' => $debug_info]);
 			}
 
 			if (empty($data) || ! is_array($data)) {
-				error_log('Onlive WA: Data is empty or not an array');
-				$this->send_json_response(false, 'Unable to retrieve product data');
+				$debug_info['error'] = 'Data empty or invalid';
+				$this->send_json_response(false, 'Unable to retrieve product data', ['debug' => $debug_info]);
 			}
-
-			error_log('Onlive WA: Data prepared successfully, generating message');
 
 			// Generate message
 			$message = $this->plugin->generate_message($context, $data);
 			if (empty($message)) {
-				error_log('Onlive WA: Message generation failed');
-				$this->send_json_response(false, 'Unable to generate message');
+				$debug_info['error'] = 'Message generation failed';
+				$this->send_json_response(false, 'Unable to generate message', ['debug' => $debug_info]);
 			}
-
-			error_log('Onlive WA: Message generated, getting WhatsApp URL');
 
 			// Get WhatsApp URL
 			$url = $this->plugin->get_whatsapp_url($message);
@@ -417,10 +422,17 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				$url = 'https://wa.me/?text=' . rawurlencode($message);
 			}
 
-			error_log('Onlive WA: Success - URL: ' . $url);
+			$debug_info['success'] = true;
+			$debug_info['url_length'] = strlen($url);
+			$debug_info['message_length'] = strlen($message);
 
 			// Return success
-			$this->send_json_response(true, 'Success', ['url' => $url, 'message' => $message]);
+			$this->send_json_response(true, 'Success', ['url' => $url, 'message' => $message, 'debug' => $debug_info]);
+
+			} catch (Exception $e) {
+				$debug_info['exception'] = $e->getMessage();
+				$this->send_json_response(false, 'Exception: ' . $e->getMessage(), ['debug' => $debug_info]);
+			}
 		}
 
 		/**
