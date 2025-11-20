@@ -415,8 +415,15 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 				$variation_text = $this->format_variations( $product->get_variation_attributes() );
 			}
 
+			// Get product link if enabled
+			$product_link = '';
+			if ( $this->plugin->get_setting( 'include_product_link', 1 ) ) {
+				$product_link = $base_product->get_permalink();
+			}
+
 			return [
 				'product_name'      => $product->get_name(),
+				'product_link'      => $product_link,
 				'product_price'     => $price_label,
 				'product_quantity'  => $quantity,
 				'product_variation' => $variation_text,

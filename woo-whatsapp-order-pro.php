@@ -172,30 +172,29 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 		 *
 		 * @return array
 		 */
-		public function get_default_settings() {
-			return [
-				'enabled'            => 1,
-				'phone'              => '',
-				'positions'          => [
-					'single' => 1,
-					'cart'   => 1,
-				],
-				'button_label_single' => __( 'Order via WhatsApp', 'onlive-wa-order' ),
-				'button_label_cart'   => __( 'Order Cart via WhatsApp', 'onlive-wa-order' ),
-				'button_color'        => '#25D366',
-				'button_text_color'   => '#ffffff',
-				'button_size'         => 'medium',
-				'template_enabled'    => 0,
-				'message_template'    => "Hello, I would like to order {{product_name}}. Price: {{product_price}} x {{product_quantity}}. {{product_variation}}",
-				'api_choice'          => 'wa',
-				'custom_gateway'      => '',
-				'custom_query_param'  => 'text',
-				'load_css'            => 1,
-				'custom_css'          => '',
-			];
-		}
-
-		/**
+	public function get_default_settings() {
+		return [
+			'enabled'            => 1,
+			'phone'              => '',
+			'positions'          => [
+				'single' => 1,
+				'cart'   => 1,
+			],
+			'button_label_single' => __( 'Order via WhatsApp', 'onlive-wa-order' ),
+			'button_label_cart'   => __( 'Order Cart via WhatsApp', 'onlive-wa-order' ),
+			'button_color'        => '#25D366',
+			'button_text_color'   => '#ffffff',
+			'button_size'         => 'medium',
+			'template_enabled'    => 0,
+			'message_template'    => "Hello, I would like to order {{product_name}}. Price: {{product_price}} x {{product_quantity}}. {{product_variation}}",
+			'api_choice'          => 'wa',
+			'custom_gateway'      => '',
+			'custom_query_param'  => 'text',
+			'load_css'            => 1,
+			'custom_css'          => '',
+			'include_product_link' => 1,
+		];
+	}		/**
 		 * Refresh cached settings.
 		 */
 		public function refresh_settings() {
@@ -292,6 +291,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 
 			$replacements = [
 				'product_name'     => isset( $data['product_name'] ) ? $data['product_name'] : '',
+				'product_link'     => isset( $data['product_link'] ) ? $data['product_link'] : '',
 				'product_price'    => isset( $data['product_price'] ) ? $data['product_price'] : '',
 				'product_quantity' => isset( $data['product_quantity'] ) ? $data['product_quantity'] : '',
 				'product_variation'=> isset( $data['product_variation'] ) ? $data['product_variation'] : '',
@@ -340,6 +340,12 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 				return '';
 			}
 
+			// Trim and clean message to avoid encoding issues
+			$message = trim( (string) $message );
+			
+			// Normalize newlines: convert to standard format before URL encoding
+			$message = str_replace( [ "\r\n", "\r" ], "\n", $message );
+			
 			$encoded  = rawurlencode( $message );
 			$choice   = $this->get_setting( 'api_choice', 'wa' );
 			$endpoint = '';

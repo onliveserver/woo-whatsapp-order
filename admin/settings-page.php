@@ -73,6 +73,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_settings_field( 'button_size', __( 'Button size', 'onlive-wa-order' ), [ $this, 'field_button_size' ], 'onlive-wa-order-button', 'onlive_wa_order_button' );
 
 			add_settings_section( 'onlive_wa_order_template', __( 'Message Template Settings', 'onlive-wa-order' ), '__return_false', 'onlive-wa-order-template' );
+			add_settings_field( 'include_product_link', __( 'Include product link', 'onlive-wa-order' ), [ $this, 'field_include_product_link' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
 			add_settings_field( 'template_toggle', __( 'Custom template', 'onlive-wa-order' ), [ $this, 'field_template_toggle' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
 			add_settings_field( 'message_template', __( 'Template builder', 'onlive-wa-order' ), [ $this, 'field_message_template' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
 			add_settings_field( 'template_preview', __( 'Live preview', 'onlive-wa-order' ), [ $this, 'field_template_preview' ], 'onlive-wa-order-template', 'onlive_wa_order_template' );
@@ -119,6 +120,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				[
 					'placeholders' => [
 						'{{product_name}}',
+						'{{product_link}}',
 						'{{product_price}}',
 						'{{product_quantity}}',
 						'{{product_variation}}',
@@ -336,6 +338,18 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				<?php endforeach; ?>
 			</select>
 			<p class="description"><?php esc_html_e( 'Control the minimum width and padding of the button.', 'onlive-wa-order' ); ?></p>
+			<?php
+		}
+
+		public function field_include_product_link() {
+			$enabled = (bool) $this->option( 'include_product_link', true );
+			?>
+			<input type="hidden" name="<?php echo esc_attr( $this->option_name ); ?>[include_product_link]" value="0" />
+			<label for="onlive-wa-include-product-link">
+				<input type="checkbox" id="onlive-wa-include-product-link" name="<?php echo esc_attr( $this->option_name ); ?>[include_product_link]" value="1" <?php checked( $enabled ); ?> />
+				<?php esc_html_e( 'Include product link in messages', 'onlive-wa-order' ); ?>
+			</label>
+			<p class="description"><?php esc_html_e( 'When enabled, the product URL will be included in the WhatsApp message using {{product_link}} variable.', 'onlive-wa-order' ); ?></p>
 			<?php
 		}
 
