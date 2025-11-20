@@ -1,0 +1,44 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# WordPress
+wp-config.php
+wp-content/uploads/
+wp-content/backup-*
+wp-content/cache/
+
+# Composer
+vendor/
+composer.lock
+
+# Node/NPM
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Build files
+dist/
+build/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+.phpunit.result.cache
