@@ -61,12 +61,27 @@
 				if (response.success && response.data && response.data.url) {
 					window.open(response.data.url, '_blank');
 				} else {
-					showError(response.message || 'An error occurred');
+					var errorMsg = response.message || 'An error occurred';
+					if (response.data && response.data.debug) {
+						errorMsg += '\n\nDebug Info:\n' + JSON.stringify(response.data.debug, null, 2);
+					}
+					showError(errorMsg);
 				}
 			},
 
-			error: function () {
-				showError('Request failed - please try again');
+			error: function (xhr, status, error) {
+				var errorMsg = 'Request failed - please try again';
+				if (xhr.responseText) {
+					try {
+						var response = JSON.parse(xhr.responseText);
+						if (response.data && response.data.debug) {
+							errorMsg += '\n\nDebug Info:\n' + JSON.stringify(response.data.debug, null, 2);
+						}
+					} catch (e) {
+						errorMsg += '\n\nServer Response: ' + xhr.responseText;
+					}
+				}
+				showError(errorMsg);
 			},
 
 			complete: function () {
