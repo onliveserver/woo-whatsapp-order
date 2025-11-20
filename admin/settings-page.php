@@ -41,6 +41,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			add_action( 'save_post_product', [ $this, 'save_product_metabox' ] );
 			add_action( 'wp_ajax_onlive_wa_check_updates', [ $this, 'ajax_check_updates' ] );
 			add_action( 'wp_ajax_onlive_wa_force_reinstall', [ $this, 'ajax_force_reinstall' ] );
+			add_action( 'wp_ajax_onlive_wa_auto_install_update', [ $this, 'ajax_auto_install_update' ] );
 		}
 
 		/**
@@ -209,111 +210,27 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			settings_errors( $this->option_name );
 			?>
 			<div class="wrap onlive-wa-settings">
-				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-					<h1><?php esc_html_e( 'WhatsApp Order Pro', 'onlive-wa-order' ); ?></h1>
-					<div style="display: flex; gap: 10px;">
-						<button type="button" id="onlive-wa-check-updates-btn" class="button button-secondary" style="margin-top: 5px;">
-							<span class="dashicons dashicons-update" style="margin-right: 5px; margin-top: 2px;"></span>
-							<?php esc_html_e( 'Check for Updates', 'onlive-wa-order' ); ?>
-						</button>
-						<button type="button" id="onlive-wa-force-reinstall-btn" class="button button-secondary" style="margin-top: 5px;">
-							<span class="dashicons dashicons-admin-tools" style="margin-right: 5px; margin-top: 2px;"></span>
-							<?php esc_html_e( 'Force Reinstall', 'onlive-wa-order' ); ?>
-						</button>
-					</div>
+				<div style="margin-bottom: 20px;">
+					<h1><?php esc_html_e( 'WhatsApp Order Pro', 'onlive-wa-order' ); ?> <span style="font-size: 0.6em; color: #666; margin-left: 15px;"><?php echo 'v' . esc_html( $this->plugin->version ); ?></span></h1>
 				</div>
 				<h2 class="nav-tab-wrapper">
 					<?php foreach ( $tabs as $slug => $label ) : ?>
 						<a href="<?php echo esc_url( add_query_arg( 'tab', $slug, admin_url( 'admin.php?page=onlive-wa-order' ) ) ); ?>" class="nav-tab <?php echo $slug === $current_tab ? 'nav-tab-active' : ''; ?>"><?php echo esc_html( $label ); ?></a>
 					<?php endforeach; ?>
 				</h2>
-				<form method="post" action="options.php">
-					<?php
-					settings_fields( 'onlive_wa_order_settings_group' );
-					do_settings_sections( $tab_page );
-					submit_button();
-					?>
-				</form>
+				<?php if ( 'updates' === $current_tab ) : ?>
+					<?php $this->render_updates_tab(); ?>
+				<?php else : ?>
+					<form method="post" action="options.php">
+						<?php
+						settings_fields( 'onlive_wa_order_settings_group' );
+						do_settings_sections( $tab_page );
+						submit_button();
+						?>
+					</form>
+				<?php endif; ?>
 				<?php $this->include_tab_notes( $current_tab ); ?>
 			</div>
-			<script>
-				(function($) {
-					$('#onlive-wa-check-updates-btn').on('click', function() {
-						var btn = $(this);
-						var originalText = btn.html();
-						btn.prop('disabled', true).html('<span class="spinner" style="float: left; margin-right: 8px;"></span><?php esc_html_e( 'Checking...', 'onlive-wa-order' ); ?>');
-						
-						$.ajax({
-							type: 'POST',
-							url: onliveWAAdmin.ajax_url,
-							data: {
-								action: 'onlive_wa_check_updates',
-								nonce: onliveWAAdmin.nonce
-							},
-							success: function(response) {
-								var message = response.data || '<?php esc_html_e( 'Update check completed.', 'onlive-wa-order' ); ?>';
-								alert(message);
-								setTimeout(function() {
-									location.reload();
-								}, 1000);
-							},
-							error: function() {
-								alert('<?php esc_html_e( 'Error checking for updates. Please try again.', 'onlive-wa-order' ); ?>');
-							},
-							complete: function() {
-								btn.prop('disabled', false).html(originalText);
-							}
-						});
-					});
-
-					$('#onlive-wa-force-reinstall-btn').on('click', function() {
-						if (!confirm('<?php esc_html_e( 'This will reset all plugin data and settings. Are you sure?', 'onlive-wa-order' ); ?>')) {
-							return;
-						}
-
-						var btn = $(this);
-						var originalText = btn.html();
-						btn.prop('disabled', true).html('<span class="spinner" style="float: left; margin-right: 8px;"></span><?php esc_html_e( 'Reinstalling...', 'onlive-wa-order' ); ?>');
-						
-						$.ajax({
-							type: 'POST',
-							url: onliveWAAdmin.ajax_url,
-							data: {
-								action: 'onlive_wa_force_reinstall',
-								nonce: onliveWAAdmin.nonce
-							},
-							success: function(response) {
-								if (response.success) {
-									var message = response.data || '<?php esc_html_e( 'Plugin reinstalled successfully. Reloading...', 'onlive-wa-order' ); ?>';
-									alert(message);
-									setTimeout(function() {
-										location.reload();
-									}, 1000);
-								} else {
-									var errorMsg = response.data || '<?php esc_html_e( 'Error during reinstallation. Please try again.', 'onlive-wa-order' ); ?>';
-									alert(errorMsg);
-									btn.prop('disabled', false).html(originalText);
-								}
-							},
-							error: function(xhr, status, error) {
-								var errorMsg = '<?php esc_html_e( 'Error during reinstallation. Please try again.', 'onlive-wa-order' ); ?>';
-								if (xhr.responseJSON && xhr.responseJSON.data) {
-									errorMsg = xhr.responseJSON.data;
-								}
-								console.error('AJAX Error:', error, xhr);
-								alert(errorMsg);
-								btn.prop('disabled', false).html(originalText);
-							},
-							complete: function() {
-								// Reset button state in case success/error handlers didn't run
-								if (btn.prop('disabled')) {
-									btn.prop('disabled', false).html(originalText);
-								}
-							}
-						});
-					});
-				})(jQuery);
-			</script>
 			<?php
 		}
 
@@ -329,6 +246,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				'template'=> __( 'Template Builder', 'onlive-wa-order' ),
 				'api'     => __( 'WhatsApp API', 'onlive-wa-order' ),
 				'design'  => __( 'Design Settings', 'onlive-wa-order' ),
+				'updates' => __( 'Updates', 'onlive-wa-order' ),
 			];
 		}
 
@@ -708,6 +626,75 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		}
 
 		/**
+		 * AJAX handler to auto install updates from GitHub.
+		 */
+		public function ajax_auto_install_update() {
+			// Verify nonce
+			$nonce = isset( $_POST['nonce'] ) ? wp_unslash( $_POST['nonce'] ) : '';
+			if ( ! $nonce || ! wp_verify_nonce( $nonce, 'onlive_wa_check_updates_nonce' ) ) {
+				wp_send_json_error( __( 'Security check failed. Please refresh the page and try again.', 'onlive-wa-order' ) );
+			}
+
+			// Check user capability
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( __( 'You do not have permission to install updates.', 'onlive-wa-order' ) );
+			}
+
+			try {
+				// Include WordPress plugin installer
+				require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+				require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+
+				// Get latest release from GitHub
+				$response = wp_remote_get(
+					'https://api.github.com/repos/onlive-technologies/onlive-whatsapp-order-pro/releases/latest',
+					[ 'timeout' => 10 ]
+				);
+
+				if ( is_wp_error( $response ) ) {
+					wp_send_json_error( __( 'Could not reach GitHub. Please try again later.', 'onlive-wa-order' ) );
+				}
+
+				$body = wp_remote_retrieve_body( $response );
+				$release = json_decode( $body );
+
+				if ( ! $release || ! isset( $release->zipball_url ) ) {
+					wp_send_json_error( __( 'Could not find release information. Please try again.', 'onlive-wa-order' ) );
+				}
+
+				// Download and install the plugin
+				$download_url = $release->zipball_url;
+				$file = download_url( $download_url );
+
+				if ( is_wp_error( $file ) ) {
+					wp_send_json_error( sprintf( __( 'Could not download plugin: %s', 'onlive-wa-order' ), $file->get_error_message() ) );
+				}
+
+				// Extract and install
+				$result = unzip_file( $file, WP_PLUGIN_DIR );
+				@unlink( $file );
+
+				if ( is_wp_error( $result ) ) {
+					wp_send_json_error( sprintf( __( 'Could not extract plugin: %s', 'onlive-wa-order' ), $result->get_error_message() ) );
+				}
+
+				// Clean up old directory if needed
+				delete_transient( 'onlive_wa_github_version' );
+				delete_transient( 'onlive_wa_github_release' );
+				wp_clean_plugins_cache();
+
+				// Refresh plugin settings
+				if ( method_exists( $this->plugin, 'refresh_settings' ) ) {
+					$this->plugin->refresh_settings();
+				}
+
+				wp_send_json_success( __( '✓ Plugin updated successfully. Your settings have been preserved.', 'onlive-wa-order' ) );
+			} catch ( Exception $e ) {
+				wp_send_json_error( sprintf( __( 'Error installing update: %s', 'onlive-wa-order' ), $e->getMessage() ) );
+			}
+		}
+
+		/**
 		 * Get default plugin settings.
 		 *
 		 * @return array
@@ -787,6 +774,204 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$version = ltrim( $data->tag_name, 'v' );
 
 			// Cache for 1 hour
+			set_transient( $cache_key, $version, HOUR_IN_SECONDS );
+
+			return $version;
+		}
+
+		/**
+		 * Render updates tab content.
+		 */
+		public function render_updates_tab() {
+			$current_version = $this->plugin->version;
+			$latest_version  = $this->get_latest_github_version();
+			$has_update      = ! is_wp_error( $latest_version ) && version_compare( $latest_version, $current_version, '>' );
+
+			?>
+			<div style="background: #fff; padding: 20px; border-radius: 5px; border: 1px solid #ddd; margin-top: 20px;">
+				<h3><?php esc_html_e( 'Plugin Information', 'onlive-wa-order' ); ?></h3>
+				<table class="form-table">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Current Version', 'onlive-wa-order' ); ?></th>
+						<td><strong><?php echo esc_html( $current_version ); ?></strong></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Latest Version', 'onlive-wa-order' ); ?></th>
+						<td>
+							<?php if ( is_wp_error( $latest_version ) ) : ?>
+								<span style="color: #d32f2f;"><?php esc_html_e( 'Could not check for updates', 'onlive-wa-order' ); ?></span>
+							<?php else : ?>
+								<strong><?php echo esc_html( $latest_version ); ?></strong>
+								<?php if ( $has_update ) : ?>
+									<span style="background: #2196F3; color: white; padding: 3px 8px; border-radius: 3px; margin-left: 10px;"><?php esc_html_e( 'Update Available', 'onlive-wa-order' ); ?></span>
+								<?php else : ?>
+									<span style="background: #4CAF50; color: white; padding: 3px 8px; border-radius: 3px; margin-left: 10px;"><?php esc_html_e( 'Up to Date', 'onlive-wa-order' ); ?></span>
+								<?php endif; ?>
+							<?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'GitHub Repository', 'onlive-wa-order' ); ?></th>
+						<td>
+							<a href="https://github.com/onlive-technologies/onlive-whatsapp-order-pro" target="_blank" style="color: #0073aa; text-decoration: none;">
+								https://github.com/onlive-technologies/onlive-whatsapp-order-pro
+								<span class="dashicons dashicons-external" style="width: 16px; height: 16px; margin-left: 5px;"></span>
+							</a>
+						</td>
+					</tr>
+				</table>
+			</div>
+
+			<div style="background: #fff; padding: 20px; border-radius: 5px; border: 1px solid #ddd; margin-top: 20px;">
+				<h3><?php esc_html_e( 'Update Actions', 'onlive-wa-order' ); ?></h3>
+				<p><?php esc_html_e( 'Use the buttons below to manage plugin updates and reinstallation.', 'onlive-wa-order' ); ?></p>
+				<div style="display: flex; gap: 10px;">
+					<button type="button" id="onlive-wa-check-updates-btn" class="button button-primary">
+						<span class="dashicons dashicons-update" style="margin-right: 5px; margin-top: 2px;"></span>
+						<?php esc_html_e( 'Check for Updates', 'onlive-wa-order' ); ?>
+					</button>
+					<?php if ( $has_update ) : ?>
+						<button type="button" id="onlive-wa-auto-install-btn" class="button button-success">
+							<span class="dashicons dashicons-download" style="margin-right: 5px; margin-top: 2px;"></span>
+							<?php esc_html_e( 'Install Update', 'onlive-wa-order' ); ?>
+						</button>
+					<?php endif; ?>
+					<button type="button" id="onlive-wa-force-reinstall-btn" class="button button-secondary">
+						<span class="dashicons dashicons-admin-tools" style="margin-right: 5px; margin-top: 2px;"></span>
+						<?php esc_html_e( 'Force Reinstall', 'onlive-wa-order' ); ?>
+					</button>
+				</div>
+			</div>
+
+			<script>
+				(function($) {
+					$('#onlive-wa-check-updates-btn').on('click', function() {
+						var btn = $(this);
+						var originalText = btn.html();
+						btn.prop('disabled', true).html('<span class="spinner" style="float: left; margin-right: 8px;"></span><?php esc_html_e( 'Checking...', 'onlive-wa-order' ); ?>');
+						
+						$.ajax({
+							type: 'POST',
+							url: onliveWAAdmin.ajax_url,
+							data: {
+								action: 'onlive_wa_check_updates',
+								nonce: onliveWAAdmin.nonce
+							},
+							success: function(response) {
+								alert('<?php esc_html_e( 'Update check completed. Please reload the page.', 'onlive-wa-order' ); ?>');
+								setTimeout(function() {
+									location.reload();
+								}, 1500);
+							},
+							error: function() {
+								alert('<?php esc_html_e( 'Error checking for updates. Please try again.', 'onlive-wa-order' ); ?>');
+								btn.prop('disabled', false).html(originalText);
+							}
+						});
+					});
+
+					$('#onlive-wa-force-reinstall-btn').on('click', function() {
+						if (!confirm('<?php esc_html_e( 'This will reinstall the plugin from GitHub. Continue?', 'onlive-wa-order' ); ?>')) {
+							return;
+						}
+
+						var btn = $(this);
+						var originalText = btn.html();
+						btn.prop('disabled', true).html('<span class="spinner" style="float: left; margin-right: 8px;"></span><?php esc_html_e( 'Installing...', 'onlive-wa-order' ); ?>');
+						
+						$.ajax({
+							type: 'POST',
+							url: onliveWAAdmin.ajax_url,
+							data: {
+								action: 'onlive_wa_force_reinstall',
+								nonce: onliveWAAdmin.nonce
+							},
+							success: function(response) {
+								if (response.success) {
+									alert('<?php esc_html_e( 'Plugin installed successfully. Reloading...', 'onlive-wa-order' ); ?>');
+									setTimeout(function() {
+										location.reload();
+									}, 1500);
+								} else {
+									alert(response.data || '<?php esc_html_e( 'Installation failed. Please try again.', 'onlive-wa-order' ); ?>');
+									btn.prop('disabled', false).html(originalText);
+								}
+							},
+							error: function() {
+								alert('<?php esc_html_e( 'Error during installation. Please try again.', 'onlive-wa-order' ); ?>');
+								btn.prop('disabled', false).html(originalText);
+							}
+						});
+					});
+
+					$('#onlive-wa-auto-install-btn').on('click', function() {
+						if (!confirm('<?php esc_html_e( 'Install the latest version? Your current settings will be preserved.', 'onlive-wa-order' ); ?>')) {
+							return;
+						}
+
+						var btn = $(this);
+						var originalText = btn.html();
+						btn.prop('disabled', true).html('<span class="spinner" style="float: left; margin-right: 8px;"></span><?php esc_html_e( 'Installing...', 'onlive-wa-order' ); ?>');
+						
+						$.ajax({
+							type: 'POST',
+							url: onliveWAAdmin.ajax_url,
+							data: {
+								action: 'onlive_wa_auto_install_update',
+								nonce: onliveWAAdmin.nonce
+							},
+							success: function(response) {
+								if (response.success) {
+									alert('<?php esc_html_e( 'Update installed successfully. Reloading...', 'onlive-wa-order' ); ?>');
+									setTimeout(function() {
+										location.reload();
+									}, 1500);
+								} else {
+									alert(response.data || '<?php esc_html_e( 'Update failed. Please try again.', 'onlive-wa-order' ); ?>');
+									btn.prop('disabled', false).html(originalText);
+								}
+							},
+							error: function() {
+								alert('<?php esc_html_e( 'Error during update. Please try again.', 'onlive-wa-order' ); ?>');
+								btn.prop('disabled', false).html(originalText);
+							}
+						});
+					});
+				})(jQuery);
+			</script>
+			<?php
+		}
+
+		/**
+		 * Get latest version from GitHub.
+		 *
+		 * @return string|WP_Error
+		 */
+		public function get_latest_github_version() {
+			$cache_key = 'onlive_wa_latest_github_version';
+			$cached    = get_transient( $cache_key );
+
+			if ( false !== $cached ) {
+				return $cached;
+			}
+
+			$response = wp_remote_get(
+				'https://api.github.com/repos/onlive-technologies/onlive-whatsapp-order-pro/releases/latest',
+				[ 'timeout' => 10 ]
+			);
+
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			$data = json_decode( $body );
+
+			if ( ! $data || ! isset( $data->tag_name ) ) {
+				return new WP_Error( 'no_version', __( 'Could not determine remote version.', 'onlive-wa-order' ) );
+			}
+
+			$version = ltrim( $data->tag_name, 'v' );
 			set_transient( $cache_key, $version, HOUR_IN_SECONDS );
 
 			return $version;
