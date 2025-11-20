@@ -346,6 +346,18 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		public function handle_ajax_message()
 		{
+			// Log the start of AJAX request
+			error_log('=== AJAX REQUEST START ===');
+			error_log('Timestamp: ' . date('Y-m-d H:i:s'));
+			error_log('User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
+			error_log('User ID: ' . (is_user_logged_in() ? get_current_user_id() : 'N/A'));
+			error_log('Request method: ' . $_SERVER['REQUEST_METHOD']);
+			error_log('Action: ' . ($_REQUEST['action'] ?? 'none'));
+			error_log('DOING_AJAX defined: ' . (defined('DOING_AJAX') ? 'YES' : 'NO'));
+			error_log('DOING_AJAX value: ' . (defined('DOING_AJAX') ? DOING_AJAX : 'N/A'));
+			error_log('POST data: ' . json_encode($_POST));
+			error_log('GET data: ' . json_encode($_GET));
+
 			// Clear output buffers
 			while (ob_get_level() > 0) {
 				ob_end_clean();
@@ -361,19 +373,24 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 
 			// Initialize WooCommerce if not already done
 			if (!function_exists('WC') && !did_action('woocommerce_init')) {
+				error_log('Initializing WooCommerce...');
 				// Load WooCommerce core
 				require_once WP_PLUGIN_DIR . '/woocommerce/woocommerce.php';
 				// Initialize WooCommerce
 				WC();
+				error_log('WooCommerce initialized');
 			}
 
 			// Ensure session is started for non-logged-in users
 			if (!is_user_logged_in() && function_exists('WC')) {
+				error_log('Initializing session/cart for non-logged-in user');
 				if (!WC()->session) {
 					WC()->initialize_session();
+					error_log('Session initialized');
 				}
 				if (!WC()->cart) {
 					WC()->initialize_cart();
+					error_log('Cart initialized');
 				}
 			}
 
@@ -386,15 +403,19 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			];
 
 			try {
+				error_log('Checking if plugin is enabled...');
 				// Check if plugin is enabled
 				if (! $this->plugin->is_enabled()) {
+					error_log('Plugin is disabled');
 					$debug_info['error'] = 'Plugin disabled';
 					$this->send_json_response(false, 'Plugin is disabled', ['debug' => $debug_info]);
 				}
 
+				error_log('Plugin is enabled, getting context...');
 				// Get context
 				$context = isset($_POST['context']) ? sanitize_key(wp_unslash($_POST['context'])) : 'product';
 				$debug_info['context'] = $context;
+				error_log('Context: ' . $context);
 
 			// Prepare data
 			if ('cart' === $context) {
@@ -417,25 +438,33 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				$debug_info['quantity'] = $quantity;
 
 				$data = $this->prepare_product_data($product_id, $variation_id, $quantity, $variations);
+				error_log('Product data prepared: ' . (is_wp_error($data) ? 'ERROR - ' . $data->get_error_message() : 'SUCCESS'));
 			}
 
 			// Check for errors
 			if (is_wp_error($data)) {
+				error_log('Data preparation error: ' . $data->get_error_message());
 				$debug_info['error'] = 'Data preparation error: ' . $data->get_error_message();
 				$this->send_json_response(false, $data->get_error_message(), ['debug' => $debug_info]);
 			}
 
 			if (empty($data) || ! is_array($data)) {
+				error_log('Data is empty or not an array');
 				$debug_info['error'] = 'Data empty or invalid';
 				$this->send_json_response(false, 'Unable to retrieve product data', ['debug' => $debug_info]);
 			}
 
+			error_log('Data validation passed, generating message...');
+
 			// Generate message
 			$message = $this->plugin->generate_message($context, $data);
 			if (empty($message)) {
+				error_log('Message generation failed');
 				$debug_info['error'] = 'Message generation failed';
 				$this->send_json_response(false, 'Unable to generate message', ['debug' => $debug_info]);
 			}
+
+			error_log('Message generated successfully, getting WhatsApp URL...');
 
 			// Get WhatsApp URL
 			$url = $this->plugin->get_whatsapp_url($message);
@@ -445,6 +474,9 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 				$url = 'https://wa.me/?text=' . rawurlencode($message);
 			}
 
+			error_log('WhatsApp URL generated: ' . $url);
+			error_log('=== AJAX REQUEST END - SUCCESS ===');
+
 			$debug_info['success'] = true;
 			$debug_info['url_length'] = strlen($url);
 			$debug_info['message_length'] = strlen($message);
@@ -453,6 +485,9 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 			$this->send_json_response(true, 'Success', ['url' => $url, 'message' => $message, 'debug' => $debug_info]);
 
 			} catch (Exception $e) {
+				error_log('=== AJAX REQUEST END - EXCEPTION ===');
+				error_log('Exception: ' . $e->getMessage());
+				error_log('Stack trace: ' . $e->getTraceAsString());
 				$debug_info['exception'] = $e->getMessage();
 				$this->send_json_response(false, 'Exception: ' . $e->getMessage(), ['debug' => $debug_info]);
 			}
@@ -544,18 +579,26 @@ if (! class_exists('Onlive_WA_Order_Pro_Frontend')) {
 		 */
 		protected function prepare_cart_data()
 		{
+			error_log('=== PREPARING CART DATA ===');
+			error_log('WC function exists: ' . (function_exists('WC') ? 'YES' : 'NO'));
+			error_log('WC()->cart exists: ' . (function_exists('WC') && WC()->cart ? 'YES' : 'NO'));
+
 			if (! function_exists('WC') || ! WC()->cart) {
+				error_log('Cart not available - returning error');
 				return new WP_Error('missing_cart', __('Cart is empty or not available.', 'onlive-wa-order'));
 			}
 
 			$cart = WC()->cart;
 			$cart_contents = $cart->get_cart();
+			error_log('Cart contents count: ' . count($cart_contents));
 
 			// Check if cart has items
 			if (empty($cart_contents)) {
+				error_log('Cart is empty - returning error');
 				return new WP_Error('empty_cart', __('Your cart is empty.', 'onlive-wa-order'));
 			}
 
+			error_log('Cart has items, formatting cart data...');
 			$items_text  = $this->format_cart_items($cart_contents);
 			$total_raw   = strip_tags(html_entity_decode($cart->get_total()));
 			$total_items = $cart->get_cart_contents_count();
