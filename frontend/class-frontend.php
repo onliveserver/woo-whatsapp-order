@@ -148,7 +148,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Frontend' ) ) {
 		 * AJAX handler for health check / ping.
 		 */
 		public function handle_ping() {
-			wp_send_json_success( [ 'status' => 'ok', 'plugin' => 'onlive-wa-order' ] );
+			// Simple debug - just echo text to see if this gets through
+			echo 'PING_OK_' . date( 'Y-m-d H:i:s' );
+			exit;
 		}
 
 		/**
