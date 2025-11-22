@@ -136,38 +136,16 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 	 * Bootstrap plugin components.
 	 */
 	public function bootstrap() {
-		// Debug logging
-		$debug_file = ONLIVE_WA_ORDER_PATH . 'debug.log';
-		file_put_contents($debug_file, date('Y-m-d H:i:s') . " Bootstrap called\n", FILE_APPEND);
-		file_put_contents($debug_file, "is_checkout: " . (function_exists('is_checkout') ? (is_checkout() ? 'true' : 'false') : 'func not exists') . "\n", FILE_APPEND);
-		file_put_contents($debug_file, "wc-ajax: " . (isset($_GET['wc-ajax']) ? $_GET['wc-ajax'] : 'not set') . "\n", FILE_APPEND);
-		file_put_contents($debug_file, "REQUEST_URI: " . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set') . "\n", FILE_APPEND);
-
 		// Don't load plugin on checkout pages to prevent session conflicts
 		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
-			file_put_contents($debug_file, "Exiting due to is_checkout\n", FILE_APPEND);
 			return;
 		}
 
 		// Exclude on all AJAX and REST API requests to prevent interference
 		if ( ( defined('DOING_AJAX') && DOING_AJAX ) || ( defined('REST_REQUEST') && REST_REQUEST ) ) {
-			file_put_contents($debug_file, "Exiting due to AJAX or REST\n", FILE_APPEND);
 			return;
 		}
 
-		// Also exclude on WooCommerce checkout AJAX requests (fallback)
-		if ( isset( $_GET['wc-ajax'] ) ) {
-			file_put_contents($debug_file, "Exiting due to wc-ajax=" . $_GET['wc-ajax'] . "\n", FILE_APPEND);
-			return;
-		}
-
-		// Also exclude on WooCommerce REST API checkout requests (fallback)
-		if ( isset( $_SERVER['REQUEST_URI'] ) && strpos( $_SERVER['REQUEST_URI'], 'wp-json/wc/store/v1/checkout' ) !== false ) {
-			file_put_contents($debug_file, "Exiting due to REST checkout\n", FILE_APPEND);
-			return;
-		}
-
-		file_put_contents($debug_file, "Continuing with bootstrap\n", FILE_APPEND);
 		$this->settings = Onlive_WA_Order_Settings_Index::get_saved();
 
 		if ( is_admin() ) {
