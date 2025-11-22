@@ -100,7 +100,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Product_Data' ) ) {
 				'product_quantity'  => $quantity,
 				'product_variation' => $variation_text,
 				'product_sku'       => $product->get_sku(),
-				'cart_total'        => '',
 			];
 		}
 

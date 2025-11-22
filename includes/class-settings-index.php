@@ -29,10 +29,8 @@ if ( ! class_exists( 'Onlive_WA_Order_Settings_Index' ) ) {
 				'phone'              => '',
 				'positions'          => [
 					'single' => 1,
-					'cart'   => 1,
 				],
 				'button_label_single' => __( 'Order via WhatsApp', 'onlive-wa-order' ),
-				'button_label_cart'   => __( 'Order Cart via WhatsApp', 'onlive-wa-order' ),
 				'button_color'        => '#25D366',
 				'button_text_color'   => '#ffffff',
 				'button_size'         => 'medium',

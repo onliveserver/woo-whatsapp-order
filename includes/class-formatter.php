@@ -13,45 +13,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Formatter' ) ) {
 	class Onlive_WA_Order_Formatter {
 
 		/**
-		 * Format cart items list.
-		 *
-		 * @param array $cart_items Cart items array.
-		 *
-		 * @return string
-		 */
-		public static function format_cart_items( $cart_items ) {
-			$lines = [];
-			foreach ( $cart_items as $item ) {
-				$product = $item['data'];
-				if ( ! $product ) {
-					continue;
-				}
-
-				$variation_text = '';
-				if ( ! empty( $item['variation'] ) ) {
-					$variation_text = self::format_variations( $item['variation'] );
-				}
-
-				$currency_symbol = function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$';
-				$line_total = $currency_symbol . number_format( $item['line_total'], 2 );
-				$line       = sprintf(
-					'%1$dx %2$s%3$s - %4$s',
-					$item['quantity'],
-					$product->get_name(),
-					$variation_text ? ' (' . $variation_text . ')' : '',
-					$line_total
-				);
-				$lines[] = $line;
-			}
-
-			if ( empty( $lines ) ) {
-				return '';
-			}
-
-			return __( 'Items:', 'onlive-wa-order' ) . "\n" . implode( "\n", $lines );
-		}
-
-		/**
 		 * Format variation attributes into string.
 		 *
 		 * @param array $attributes Variation data.

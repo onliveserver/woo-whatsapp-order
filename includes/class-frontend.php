@@ -146,7 +146,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Frontend' ) ) {
 		protected function get_button_markup( $product, $context = 'product', $args = [] ) {
 			$settings = Onlive_WA_Order_Settings_Index::get_saved();
 
-			$label = ! empty( $args['label'] ) ? $args['label'] : ( 'cart' === $context ? $settings['button_label_cart'] : $settings['button_label_single'] );
+			$label = ! empty( $args['label'] ) ? $args['label'] : $settings['button_label_single'];
 
 			$product_id = $product instanceof WC_Product ? $product->get_id() : 0;
 			$classes    = [ 'onlive-wa-order-button', 'onlive-wa-size-' . $settings['button_size'] ];
