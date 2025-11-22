@@ -42,3 +42,7 @@ build/
 # Testing
 coverage/
 .phpunit.result.cache
+
+# Plugin specific
+bin/
+test*.sh

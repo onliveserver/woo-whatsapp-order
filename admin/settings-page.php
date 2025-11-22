@@ -285,8 +285,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		 * @return mixed
 		 */
 		protected function option( $key, $default = '' ) {
-			$settings = $this->plugin->get_settings();
-			return isset( $settings[ $key ] ) ? $settings[ $key ] : $default;
+			return Onlive_WA_Order_Settings_Index::get( $key, $default );
 		}
 
 		public function field_enable_plugin() {
@@ -316,25 +315,15 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				<input type="checkbox" name="<?php echo esc_attr( $this->option_name ); ?>[positions][single]" value="1" <?php checked( ! empty( $positions['single'] ) ); ?> />
 				<?php esc_html_e( 'Single product page', 'onlive-wa-order' ); ?>
 			</label>
-			<br />
-			<input type="hidden" name="<?php echo esc_attr( $this->option_name ); ?>[positions][cart]" value="0" />
-			<label>
-				<input type="checkbox" name="<?php echo esc_attr( $this->option_name ); ?>[positions][cart]" value="1" <?php checked( ! empty( $positions['cart'] ) ); ?> />
-				<?php esc_html_e( 'Cart page', 'onlive-wa-order' ); ?>
-			</label>
 			<p class="description"><?php esc_html_e( 'Choose where to display the WhatsApp Order button.', 'onlive-wa-order' ); ?></p>
 			<?php
 		}
 
 		public function field_button_labels() {
 			$single = $this->option( 'button_label_single', __( 'Order via WhatsApp', 'onlive-wa-order' ) );
-			$cart   = $this->option( 'button_label_cart', __( 'Order Cart via WhatsApp', 'onlive-wa-order' ) );
 			?>
 			<input type="text" id="onlive-wa-label-single" name="<?php echo esc_attr( $this->option_name ); ?>[button_label_single]" value="<?php echo esc_attr( $single ); ?>" class="regular-text" />
 			<p class="description"><?php esc_html_e( 'Label for the button on single product pages.', 'onlive-wa-order' ); ?></p>
-			<br />
-			<input type="text" id="onlive-wa-label-cart" name="<?php echo esc_attr( $this->option_name ); ?>[button_label_cart]" value="<?php echo esc_attr( $cart ); ?>" class="regular-text" />
-			<p class="description"><?php esc_html_e( 'Label for the button on the cart page.', 'onlive-wa-order' ); ?></p>
 			<?php
 		}
 
@@ -395,7 +384,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			$value = $this->option( 'message_template', '' );
 			?>
 			<textarea class="large-text code" rows="6" id="onlive-wa-message-template" name="<?php echo esc_attr( $this->option_name ); ?>[message_template]" placeholder="<?php esc_attr_e( 'Hello, I want to order {{product_name}}', 'onlive-wa-order' ); ?>"><?php echo esc_textarea( $value ); ?></textarea>
-			<p class="description"><?php esc_html_e( 'Available variables: {{product_name}}, {{product_price}}, {{product_quantity}}, {{product_variation}}, {{product_sku}}, {{cart_total}}, {{site_name}}, {{customer_name}}', 'onlive-wa-order' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Available variables: {{product_name}}, {{product_price}}, {{product_quantity}}, {{product_variation}}, {{product_sku}}, {{site_name}}', 'onlive-wa-order' ); ?></p>
 			<?php
 		}
 
@@ -429,11 +418,9 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		}
 
 		public function sanitize_settings( $input ) {
-			$defaults = $this->plugin->get_default_settings();
+			$defaults = Onlive_WA_Order_Settings_Index::get_defaults();
 			$clean    = wp_unslash( (array) $input );
-			$output   = $this->plugin->get_settings();
-
-			// Log the sanitization process for debugging
+			$output   = Onlive_WA_Order_Settings_Index::get_saved();
 
 			if ( isset( $clean['enabled'] ) ) {
 				$output['enabled'] = ! empty( $clean['enabled'] ) ? 1 : 0;
@@ -454,15 +441,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 		}			if ( isset( $clean['positions'] ) ) {
 				$output['positions'] = [
 					'single' => ! empty( $clean['positions']['single'] ) ? 1 : 0,
-					'cart'   => ! empty( $clean['positions']['cart'] ) ? 1 : 0,
 				];
 			}
 
 			if ( isset( $clean['button_label_single'] ) ) {
 				$output['button_label_single'] = sanitize_text_field( $clean['button_label_single'] );
-			}
-			if ( isset( $clean['button_label_cart'] ) ) {
-				$output['button_label_cart'] = sanitize_text_field( $clean['button_label_cart'] );
 			}
 
 			if ( isset( $clean['button_color'] ) ) {
@@ -590,7 +573,7 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 				wp_cache_delete( 'onlive_wa_settings' );
 
 				// Reinitialize default settings
-				$default_settings = $this->get_default_settings();
+				$default_settings = Onlive_WA_Order_Settings_Index::get_defaults();
 				update_option( $this->option_name, $default_settings );
 
 				// Save last check timestamp
@@ -698,30 +681,6 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro_Admin' ) ) {
 			wp_send_json_error( sprintf( __( 'Error installing update: %s', 'onlive-wa-order' ), $e->getMessage() ) );
 		}
 	}		/**
-		 * Get default plugin settings.
-		 *
-		 * @return array
-		 */
-		private function get_default_settings() {
-			return [
-				'enabled'               => '1',
-				'phone'                 => '',
-				'positions'             => [ 'single', 'archive', 'cart' ],
-				'button_label_single'   => __( 'Order on WhatsApp', 'onlive-wa-order' ),
-				'button_label_archive'  => __( 'Order on WhatsApp', 'onlive-wa-order' ),
-				'button_label_cart'     => __( 'Order on WhatsApp', 'onlive-wa-order' ),
-				'button_color'          => '#25D366',
-				'button_text_color'     => '#FFFFFF',
-				'button_size'           => 'medium',
-				'include_product_link'  => '1',
-				'custom_template'       => '0',
-				'message_template'      => __( 'Hello, I am interested in {{product_name}} for {{product_price}}. Please let me know more details.', 'onlive-wa-order' ),
-				'load_css'              => '1',
-				'custom_css'            => '',
-			];
-		}
-
-		/**
 		 * Get remote version from GitHub API.
 		 *
 		 * @return string|WP_Error
