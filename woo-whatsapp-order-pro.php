@@ -141,6 +141,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 			return;
 		}
 
+		// Also exclude on WooCommerce checkout AJAX requests
+		if ( isset( $_GET['wc-ajax'] ) && $_GET['wc-ajax'] === 'checkout' ) {
+			return;
+		}
+
 		$this->settings = Onlive_WA_Order_Settings_Index::get_saved();
 
 		if ( is_admin() ) {
