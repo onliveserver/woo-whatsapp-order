@@ -136,6 +136,11 @@ if ( ! class_exists( 'Onlive_WA_Order_Pro' ) ) {
 	 * Bootstrap plugin components.
 	 */
 	public function bootstrap() {
+		// Don't load plugin on checkout pages to prevent session conflicts
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+			return;
+		}
+
 		$this->settings = Onlive_WA_Order_Settings_Index::get_saved();
 
 		if ( is_admin() ) {
